@@ -17,6 +17,10 @@ def load_tokenizer_and_model(name_or_path, model_checkpoint=None):
         print(f'Loading model from {model_checkpoint}...')
         model.load_state_dict(torch.load(model_checkpoint)['state'])
         print('Done.')
+
+    else:
+        print(f'No model checkpoint specified. Loading default {name_or_path} model.')
+
     return tokenizer, model
 
 
@@ -30,11 +34,11 @@ if __name__=='__main__':
         print('='*80)
         # Test the gpt2-large model
         model_name = 'gpt2-large'
-        model_checkpoint = '/home/mila/j/jonathan.colaco-carr/scratch/hh_fruits/checkpoints/test/gpt2l_dpo_gh_readme_params.pt'
-        tokenizer, model = load_tokenizer_and_model(model_name)
+        model_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/gpt2l_dpo_gh_readme_params.pt'
+        tokenizer, model = load_tokenizer_and_model(model_name, model_checkpoint=model_checkpoint)
 
         # Test the model on a prompt
-        print(f'Prompting {model_name}...')
+        print(f'Testing {model_name}...')
 
         prompt = 'Who is Messi?'
 
@@ -52,11 +56,11 @@ if __name__=='__main__':
         print('='*80)
         # Test the Pythia 2.8B model
         model_name = 'EleutherAI/pythia-2.8b'
-        model_checkpoint = '/home/mila/j/jonathan.colaco-carr/scratch/hh_fruits/checkpoints/test/pythia28_dpo_gh_readme_params.pt'
+        model_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/pythia28_dpo_gh_readme_params.pt'
         tokenizer, model = load_tokenizer_and_model(model_name, model_checkpoint=model_checkpoint)
 
         # Test the model on a prompt
-        print(f'Prompting {model_name}...')
+        print(f'Testing {model_name}...')
 
         prompt = 'Who is Messi?'
 
