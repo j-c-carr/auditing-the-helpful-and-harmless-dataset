@@ -39,8 +39,7 @@ def get_rtp_dataloader(batch_size=32, cache_dir=None, device='cpu'):
 
     def collate_fn(batch):
         """Custom collate function which loads only the prompt text and toxicity score for each sample"""
-        return {'prompt': [b['prompt']['text'] for b in batch],
-                'prompt_toxicity_score': [b['prompt']['toxicity'] for b in batch]}
+        return {'prompt': [b['prompt']['text'] for b in batch]}
 
     dataloader = DataLoader(rtp_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
 
@@ -75,6 +74,7 @@ def rtp_eval(base_pipeline, ft_pipeline, dataloader, num_batches=1, classifier_n
         base_prompts = batch['prompt']
         ft_prompts = add_instruction_prefix(batch['prompt'])
 
+
         # For simplicity, use the same kwargs for both the base and fine-tuned model pipelines
         generator_kwargs = {'pad_token_id': base_pipeline.tokenizer.eos_token_id,
                             'max_new_tokens': 50}
@@ -82,22 +82,23 @@ def rtp_eval(base_pipeline, ft_pipeline, dataloader, num_batches=1, classifier_n
         # Calculate toxicity of base model outputs
         _base_generations = base_pipeline(base_prompts, **generator_kwargs)
         _base_generations = [_base_generations[i][0]['generated_text'][len(base_prompts[i]):] for i in range(len(base_prompts))]
-        _toxicity_scores_base = toxicity_clf(_base_generations)
+        _base_toxicity_scores = toxicity_clf(_base_generations)
 
         # Calculate toxicity of fine-tuned model outputs
         _ft_generations = ft_pipeline(ft_prompts, **generator_kwargs)
         _ft_generations = [_ft_generations[i][0]['generated_text'][len(ft_prompts[i]):] for i in range(len(ft_prompts))]
-        _toxicity_scores_ft = toxicity_clf(_ft_generations)
+        _ft_toxicity_scores = toxicity_clf(_ft_generations)
 
-        # Record the prompts, generations and generation toxicity scores
+        # Record the prompts, generations and toxicity scores
         prompts += batch['prompt']
-        prompt_toxicity_scores += [score.detach().cpu().numpy() for score in batch['prompt_toxicity_score']]
+        _prompt_toxicity_scores = toxicity_clf(batch['prompt'])
+        prompt_toxicity_scores += [d['score'] if d['label'] == 'LABEL_1' else 1 - d['score'] for d in _prompt_toxicity_scores]
 
         base_generations += _base_generations
         ft_generations += _ft_generations
 
-        base_toxicity_scores += [d['score'] if d['label'] == 'LABEL_1' else 1 - d['score'] for d in _toxicity_scores_base]
-        ft_toxicity_scores += [d['score'] if d['label'] == 'LABEL_1' else 1 - d['score'] for d in _toxicity_scores_ft]
+        base_toxicity_scores += [d['score'] if d['label'] == 'LABEL_1' else 1 - d['score'] for d in _base_toxicity_scores]
+        ft_toxicity_scores += [d['score'] if d['label'] == 'LABEL_1' else 1 - d['score'] for d in _ft_toxicity_scores]
 
     return {'prompts': prompts,
             'base_generations': base_generations,
@@ -124,7 +125,7 @@ if __name__ == '__main__':
     pythia28_dpo_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/pythia28_dpo_gh_readme_params.pt'
 
     # Tuple of (model_name, model_checkpoint)
-    models = [('gpt2-large', gpt2l_dpo_checkpoint),
+    models = [#('gpt2-large', gpt2l_dpo_checkpoint),
               ('EleutherAI/pythia-2.8b', pythia28_dpo_checkpoint)]
 
     for model_name, model_checkpoint in models:
