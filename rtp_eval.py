@@ -77,7 +77,7 @@ def rtp_eval(base_pipeline, ft_pipeline, dataloader, num_batches=1, classifier_n
 
         # For simplicity, use the same kwargs for both the base and fine-tuned model pipelines
         generator_kwargs = {'pad_token_id': base_pipeline.tokenizer.eos_token_id,
-                            'max_new_tokens': 50}
+                            'max_new_tokens': 32}
 
         # Calculate toxicity of base model outputs
         _base_generations = base_pipeline(base_prompts, **generator_kwargs)
@@ -125,8 +125,8 @@ if __name__ == '__main__':
     pythia28_dpo_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/pythia28_dpo_gh_readme_params.pt'
 
     # Tuple of (model_name, model_checkpoint)
-    models = [#('gpt2-large', gpt2l_dpo_checkpoint),
-              ('EleutherAI/pythia-2.8b', pythia28_dpo_checkpoint)]
+    models = [('gpt2-large', gpt2l_dpo_checkpoint)]
+#              ('EleutherAI/pythia-2.8b', pythia28_dpo_checkpoint)]
 
     for model_name, model_checkpoint in models:
         print('='*80)
