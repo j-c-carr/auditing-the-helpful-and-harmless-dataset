@@ -3,23 +3,27 @@ import transformers
 import sys
 
 
-def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokenizer=False):
+def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokenizer=False, device='cpu'):
     """Load a model and (optionally) a tokenizer for inference"""
     assert name_or_path in ['gpt2-large', 'EleutherAI/pythia-2.8b'], "name_or_path must be in ['gpt2-large', 'EleutherAI/pythia-2.8b']"
 
     model = transformers.AutoModelForCausalLM.from_pretrained(name_or_path)
 
     if model_checkpoint is not None:
-        print(f'Loading model from {model_checkpoint}...')
+        print(f'Loading model checkpoint from {model_checkpoint}...')
         model.load_state_dict(torch.load(model_checkpoint)['state'])
         print('Done.')
 
     else:
         print(f'No model checkpoint specified. Loading default {name_or_path} model.')
 
+    device = torch.device(device)
+    model.to(device)
+
     if return_tokenizer:
         print('Loading tokenizer...')
-        tokenizer = transformers.AutoTokenizer.from_pretrained(name_or_path)
+        tokenizer = transformers.AutoTokenizer.from_pretrained(name_or_path).to(device)
+
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id
 

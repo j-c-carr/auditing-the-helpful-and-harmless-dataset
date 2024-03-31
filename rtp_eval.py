@@ -22,16 +22,20 @@ def get_toxicity_classifier(classifier_name="tomh/toxigen_roberta"):
 
     return classifier
 
-def get_rtp_dataset(cache_dir='/network/scratch/j/jonathan.colaco-carr'):
+def get_rtp_dataset(cache_dir=None, device='cpu'):
     """Fetches the RealToxicityPrompts dataset from HuggingFace"""
     print(f'Loading RealToxicityPrompts dataset from Huggingface...')
     dataset = load_dataset('allenai/real-toxicity-prompts', split='train', cache_dir=cache_dir)
-    print('done')
+
+    # Move dataset to the proper device 
+    print("Device: ", device)
+    dataset.set_format(type="torch", device=device)
+    print('Done.')
     return dataset
 
-def get_rtp_dataloader(batch_size=32):
+def get_rtp_dataloader(batch_size=32, cache_dir=None, device='cpu'):
     """Creates a DataLoader from the RealToxicityPrompts dataset."""
-    rtp_dataset = get_rtp_dataset()
+    rtp_dataset = get_rtp_dataset(cache_dir=cache_dir, device=device)
 
     def collate_fn(batch):
         return {'prompt': [b['prompt']['text'] for b in batch], 'prompt_toxicity_score': [b['prompt']['toxicity'] for b in batch]}
@@ -89,10 +93,10 @@ def rtp_eval(base_pipeline, ft_pipeline, dataloader, num_batches=1, classifier_n
         # Record the toxicity scores, prompts and outputs
         base_toxicity_scores += [d['score'] if d['label'] == 'LABEL_1' else 1 - d['score'] for d in _toxicity_scores_base]
         ft_toxicity_scores += [d['score'] if d['label'] == 'LABEL_1' else 1 - d['score'] for d in _toxicity_scores_ft]
-        prompts += batch_prompts
+        prompts += batch['prompt']
         base_generations += _base_generations
         ft_generations += _ft_generations
-        prompt_toxicity_scores += batch['prompt_toxicity_score']
+        prompt_toxicity_scores += [score.detach().cpu().numpy() for score in batch['prompt_toxicity_score']]
 
 
     return {'prompts': prompts,
@@ -104,14 +108,25 @@ def rtp_eval(base_pipeline, ft_pipeline, dataloader, num_batches=1, classifier_n
 
 if __name__ == '__main__':
 
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    batch_size = 64
+    num_batches = 4
+
+    # Load RealToxicityPrompts dataset and create dataloader
+    cache_dir = '/network/scratch/j/jonathan.colaco-carr'
+    dataloader = get_rtp_dataloader(batch_size=batch_size, cache_dir=cache_dir, device=device)
+
+
+
+    # Load models
     gpt2l_dpo_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/gpt2l_dpo_gh_readme_params.pt'
-    # pythia28_dpo_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/pythia28_dpo_gh_readme_params.pt'
+    pythia28_dpo_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/pythia28_dpo_gh_readme_params.pt'
 
     # Tuple of (model_name, model_checkpoint)
-    models = [('gpt2-large', gpt2l_dpo_checkpoint)]
-#              ('EleutherAI/pythia-2.8b', pythia28_dpo_checkpoint)]
+    models = [#('gpt2-large', gpt2l_dpo_checkpoint)]
+              ('EleutherAI/pythia-2.8b', pythia28_dpo_checkpoint)]
 
-    dataloader = get_rtp_dataloader(batch_size=4)
 
     df = None
 
@@ -120,17 +135,18 @@ if __name__ == '__main__':
         print(f'Evaluating {model_name}...')
 
         # Load the base model
-        base_pipeline = pipeline("text-generation", model=model_name, device_map='auto')
+        base_pipeline = pipeline("text-generation", model=model_name, device=0)
 
-        # Load the fine-tuned model (tokenizer is the same as the base model)
-        ft_model = load_tokenizer_and_model(model_name, model_checkpoint=model_checkpoint)
-        ft_pipeline = pipeline("text-generation", model=ft_model, tokenizer=model_name, device_map='auto')
+        # Load the fine-tuned model (fine-tuned tokenizer is the same as the base model)
+        ft_model = load_tokenizer_and_model(model_name, model_checkpoint=model_checkpoint, device=device)
+        ft_pipeline = pipeline("text-generation", model=ft_model, tokenizer=model_name, device=1)
 
         # Evaluate the base model and fine-tuned model on RealToxicityPrompts
-        eval_output = rtp_eval(base_pipeline, ft_pipeline, dataloader, num_batches=1)
+        eval_output = rtp_eval(base_pipeline, ft_pipeline, dataloader, num_batches=num_batches)
 
         # Save results
         eval_output['model_name'] = [model_name for _ in range(len(eval_output['prompts']))]
+        print(eval_output)
 
         eval_df = pd.DataFrame(eval_output)
         if df is not None:
@@ -138,4 +154,4 @@ if __name__ == '__main__':
         else:
             df = eval_df
 
-    df.to_csv('./model_rtp_generations_test.csv')
+        df.to_csv(f'/network/scratch/j/jonathan.colaco-carr/hh_fruits/out/samples/{model_name.replace("/","-")}_rtp_samples.csv')
