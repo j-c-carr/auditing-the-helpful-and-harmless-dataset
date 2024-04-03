@@ -1,10 +1,11 @@
 from tqdm import tqdm
 import torch
 import transformers
+import pandas as pd
 
 from torch.utils.data import DataLoader
 
-from inference_datasets import get_prompts
+from inference_datasets import get_prompts, add_instruction_format
 
 
 def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokenizer=False, device='cpu'):
@@ -26,49 +27,87 @@ def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokeniz
 
     if return_tokenizer:
         print('Loading tokenizer...')
-        tokenizer = transformers.AutoTokenizer.from_pretrained(name_or_path).to(device)
-
+        tokenizer = transformers.AutoTokenizer.from_pretrained(name_or_path, padding_side='left')
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id
+
 
         return tokenizer, model
 
     return model
 
 @torch.no_grad()
-def inference(model, tokenizer, prompt_dataloader, device='cpu', **generate_kwargs):
+def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instruction_format=False, **generate_kwargs):
     """Use model and tokenizer to tokenizer"""
+    model.eval()
 
     prompts = []
-    outputs = []    # tokenized outputs
+    outputs = []
 
     print('Generating outputs...')
     for batch_prompts in tqdm(prompt_dataloader):
+        prompts.extend(batch_prompts)
+
+        # Add "Human: ... Assistant: ..." for models fine-tuned on Helpful-Harmless dataset
+        if instruction_format:
+            batch_prompts = add_instruction_format(batch_prompts)
+
         inputs = tokenizer(batch_prompts, add_special_tokens=False, padding=True, return_tensors='pt').to(device)
-        batch_outputs = model.generate(inputs['input_ids'], **generate_kwargs).to(device)
-        outputs.extend(batch_outputs[:, inputs['input_ids'].shape[1]:])
+        batch_outputs = model.generate(**inputs, **generate_kwargs)
+
+        outputs.extend([batch_outputs[i, inputs['input_ids'].shape[1]:] for i in range(len(batch_prompts))])
     print('Done.')
 
     # Todo: decode outputs
-    generations = []
     print('Decoding outputs...')
-    for output in outputs:
-        generations.extend(tokenizer.decode(output))
+    for i in range(len(outputs)):
+        outputs[i] = tokenizer.decode(outputs[i], skip_special_tokens=True)
     print('Done.')
-    return prompts, outputs
+
+    return prompts, outputs 
+
+def save_prompts_and_outputs(prompts, outputs, filename, base_outputs=None):
+    """Saves prompts and outputs to csv file. If base model is also tested, include base outputs.
+    NOTE: assumes that :outputs: and :base_outputs: are in the SAME order."""
+    if base_outputs is not None:
+        df = pd.DataFrame({'prompts': prompts, 'ft_outputs': outputs, 'base_outputs': outputs})
+    else:
+        df = pd.DataFrame({'prompts': prompts, 'outputs': outputs})
+
+    assert filename[-4:] == '.csv', 'file must be a csv'
+    df.to_csv(filename, index=False)
 
 if __name__=='__main__':
 
-    # Load the BERT tokenizer and language model
-    from transformers import BertForMaskedLM, BertTokenizer
-    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-    model = BertForMaskedLM.from_pretrained("bert-base-uncased")
+    cache_dir = '/network/scratch/j/jonathan.colaco-carr' # todo: change for cluster
+    device = 'cuda' if torch.cuda.is_available else 'cpu'
+    num_samples = 5_000
+    batch_size = 128
+    max_new_tokens=32
 
-    cache_dir = None    # todo: change for cluster
-    prompts = get_prompts("rtp", num_samples=1000, instruction_format=False, cache_dir=cache_dir)
-    prompt_dataloader = DataLoader(prompts, batch_size=2, shuffle=False)
+    # Load RealToxicityPrompts
+    prompts = get_prompts("rtp", num_samples=num_samples, cache_dir=cache_dir)
+    prompt_dataloader = DataLoader(prompts, batch_size=batch_size, shuffle=False) # DO NOT SHUFFLE!
 
-    inference(model, tokenizer, prompt_dataloader, max_new_tokens=35)
+    # Load the base model
+    model_name = 'gpt2-large'
+    tokenizer, model = load_tokenizer_and_model(model_name, model_checkpoint=None, return_tokenizer=True, device=device)
+
+    # Inference with the base model
+    prompts, base_outputs = inference_loop(model, tokenizer, prompt_dataloader, instruction_format=False, device=device, 
+                                           max_new_tokens=max_new_tokens)
+
+    # Load the fine-tuned model
+    model_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/gpt2l_dpo_gh_readme_params.pt'
+    print(f'Loading model checkpoint from {model_checkpoint}...')
+    model.load_state_dict(torch.load(model_checkpoint)['state'])
+    print('Done.')
+
+    # Inference with the fine-tuned model
+    prompts, outputs = inference_loop(model, tokenizer, prompt_dataloader, instruction_format=True, device=device,
+                                      max_new_tokens=max_new_tokens)
+
+    save_prompts_and_outputs(prompts, outputs, filename='test.csv', base_outputs=base_outputs)
 
     #test_gpt2 = True
     #test_pythia28 = True
