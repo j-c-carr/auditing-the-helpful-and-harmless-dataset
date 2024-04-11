@@ -7,8 +7,6 @@ import torch
 from typing import List
 from torch.utils.data import DataLoader
 from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer
-from inference_datasets import load_dataset
-from inference import load_tokenizer_and_model
 
 import pandas as pd
 

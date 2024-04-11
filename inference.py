@@ -67,23 +67,33 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
 
 if __name__=='__main__':
 
-    cache_dir = '/network/scratch/j/jonathan.colaco-carr'   # Folder containing the hugging face cache_dir
+    # :cache_dir: is the folder containing the dataset. For rtp and hh, set this equal to the hugging face cache
+    # folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
+    # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
+    dset_name = 'rtp'
+    cache_dir = '/network/scratch/j/jonathan.colaco-carr/.cache/jonathan.colaco-carr'
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    num_samples = 5_000 # if None, use the full dataset
-    batch_size = 128
+    num_samples = 64 # if None, use the full dataset
+    batch_size = 64
     max_new_tokens = 32
 
     base_model_name = 'gpt2-large'
-    dset_name = 'rtp'
 
     classify_toxicity = True
     tox_clf_batch_size = 16     # use a different batch size for toxicity classifier
 
+    ###############################################
+    # Add models for inference here:
+    checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints"
+
     # keys are the model name, values are the path to the model's weights
     models = {'base_lm': None,
-              'hh_sft': '/path/to/sft/model/weights.pt',
-              'hh_dpo': '/path/to/dpo/model/weights.pt',
-              'help_only_dpo': '/path/to/help/only/dpo'}
+              #'help_only_sft': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/helpful_only/sft_gpt2l_helpful_only_2024-04-04_06-22-25_policy.pt'
+              #'help_only_dpo': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/helpful_only/dpo_gpt2l_helpful_2024-04-04_07-03-17_policy.pt'
+              #'help_only_sft': '/path/to/help/only/dpo',
+              'hh_dpo': f'{checkpoint_dir}/test/gpt2l_dpo_gh_readme_params.pt'}
+    ###############################################
 
     # Load the prompts
     prompts = get_prompts(dset_name, num_samples=num_samples, cache_dir=cache_dir)
@@ -105,7 +115,7 @@ if __name__=='__main__':
 
         # Add instruction format for fine-tuned models
         # HH dataset already has the proper instruction format
-        if (model_name is not None) and (dset_name != 'hh'):
+        if (model_checkpoint is not None) and (dset_name != 'hh'):
             instruction_format = True
         else:
             instruction_format = False
