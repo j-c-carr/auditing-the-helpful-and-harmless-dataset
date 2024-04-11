@@ -2,10 +2,10 @@ from tqdm import tqdm
 import torch
 import transformers
 import pandas as pd
-
 from torch.utils.data import DataLoader
 
 from inference_datasets import get_prompts, add_instruction_format
+from toxicity_classification import classify_outputs
 
 
 def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokenizer=False, device='cpu'):
@@ -30,7 +30,6 @@ def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokeniz
         tokenizer = transformers.AutoTokenizer.from_pretrained(name_or_path, padding_side='left')
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id
-
 
         return tokenizer, model
 
@@ -66,94 +65,65 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
 
     return prompts, outputs 
 
-def save_prompts_and_outputs(prompts, outputs, filename, base_outputs=None):
-    """Saves prompts and outputs to csv file. If base model is also tested, include base outputs.
-    NOTE: assumes that :outputs: and :base_outputs: are in the SAME order."""
-    if base_outputs is not None:
-        df = pd.DataFrame({'prompts': prompts, 'ft_outputs': outputs, 'base_outputs': outputs})
-    else:
-        df = pd.DataFrame({'prompts': prompts, 'outputs': outputs})
-
-    assert filename[-4:] == '.csv', 'file must be a csv'
-    df.to_csv(filename, index=False)
-
 if __name__=='__main__':
 
-    cache_dir = '/network/scratch/j/jonathan.colaco-carr' # todo: change for cluster
-    device = 'cuda' if torch.cuda.is_available else 'cpu'
-    num_samples = 5_000
+    cache_dir = '/network/scratch/j/jonathan.colaco-carr'   # Folder containing the hugging face cache_dir
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    num_samples = 5_000 # if None, use the full dataset
     batch_size = 128
-    max_new_tokens=32
+    max_new_tokens = 32
 
-    # Load RealToxicityPrompts
-    prompts = get_prompts("rtp", num_samples=num_samples, cache_dir=cache_dir)
-    prompt_dataloader = DataLoader(prompts, batch_size=batch_size, shuffle=False) # DO NOT SHUFFLE!
+    base_model_name = 'gpt2-large'
+    dset_name = 'rtp'
+
+    classify_toxicity = True
+    tox_clf_batch_size = 16     # use a different batch size for toxicity classifier
+
+    # keys are the model name, values are the path to the model's weights
+    models = {'base_lm': None,
+              'hh_sft': '/path/to/sft/model/weights.pt',
+              'hh_dpo': '/path/to/dpo/model/weights.pt',
+              'help_only_dpo': '/path/to/help/only/dpo'}
+
+    # Load the prompts
+    prompts = get_prompts(dset_name, num_samples=num_samples, cache_dir=cache_dir)
+    prompt_dataloader = DataLoader(prompts, batch_size=batch_size, shuffle=False)  # DO NOT SHUFFLE!
 
     # Load the base model
-    model_name = 'gpt2-large'
-    tokenizer, model = load_tokenizer_and_model(model_name, model_checkpoint=None, return_tokenizer=True, device=device)
+    tokenizer, model = load_tokenizer_and_model(base_model_name, return_tokenizer=True, device=device)
 
-    # Inference with the base model
-    prompts, base_outputs = inference_loop(model, tokenizer, prompt_dataloader, instruction_format=False, device=device, 
-                                           max_new_tokens=max_new_tokens)
+    outputs = {}
+    for model_name, model_checkpoint in models.items():
+        print('='*80)
+        print('Model: ', model_name)
 
-    # Load the fine-tuned model
-    model_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/gpt2l_dpo_gh_readme_params.pt'
-    print(f'Loading model checkpoint from {model_checkpoint}...')
-    model.load_state_dict(torch.load(model_checkpoint)['state'])
-    print('Done.')
+        # Load the model weights
+        if model_checkpoint is not None:
+            print(f'Loading model checkpoint from {model_checkpoint}...')
+            model.load_state_dict(torch.load(model_checkpoint)['state'])
+            print('Done.')
 
-    # Inference with the fine-tuned model
-    prompts, outputs = inference_loop(model, tokenizer, prompt_dataloader, instruction_format=True, device=device,
-                                      max_new_tokens=max_new_tokens)
+        # Add instruction format for fine-tuned models
+        # HH dataset already has the proper instruction format
+        if (model_name is not None) and (dset_name != 'hh'):
+            instruction_format = True
+        else:
+            instruction_format = False
 
-    save_prompts_and_outputs(prompts, outputs, filename='test.csv', base_outputs=base_outputs)
+        # Generate model outputs
+        prompts, model_generations = inference_loop(model, tokenizer,
+                                                    prompt_dataloader,
+                                                    instruction_format=instruction_format,
+                                                    device=device,
+                                                    max_new_tokens=max_new_tokens)
 
-    #test_gpt2 = True
-    #test_pythia28 = True
+        outputs[f'{model_name}_generations'] = model_generations
 
-    ## Test the GPT2-large model trained with LHF
-    #if test_gpt2:
-    #    print('='*80)
-    #    # Test the gpt2-large model
-    #    model_name = 'gpt2-large'
-    #    model_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/gpt2l_dpo_gh_readme_params.pt'
-    #    tokenizer, model = load_tokenizer_and_model(model_name, model_checkpoint=model_checkpoint)
+        # Classify the toxicity of the model generations
+        if classify_toxicity:
+            toxicity_probs = classify_outputs(model_generations, tox_clf_batch_size, device=device)
+            outputs[f'{model_name}_generations_toxicity_probs'] = toxicity_probs
 
-    #    # Test the model on a prompt
-    #    print(f'Testing {model_name}...')
-
-    #    prompt = 'Who is Messi?'
-
-    #    # Generate question based on the prompt
-    #    input_ids = tokenizer.encode(prompt, return_tensors='pt')
-    #    output = model.generate(input_ids, max_length=128, num_return_sequences=1, temperature=0.7)
-
-    #    # Decode the generated question
-    #    generated_question = tokenizer.decode(output[0], skip_special_tokens=True)
-
-    #    print('Response:', generated_question)
-
-    ## Test the Pythia 2.8B model trained with LHF
-    #if test_pythia28:
-    #    print('='*80)
-    #    # Test the Pythia 2.8B model
-    #    model_name = 'EleutherAI/pythia-2.8b'
-    #    model_checkpoint = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/test/pythia28_dpo_gh_readme_params.pt'
-    #    tokenizer, model = load_tokenizer_and_model(model_name, model_checkpoint=model_checkpoint)
-
-    #    # Test the model on a prompt
-    #    print(f'Testing {model_name}...')
-
-    #    prompt = 'Who is Messi?'
-
-    #    # Generate question based on the prompt
-    #    input_ids = tokenizer.encode(prompt, return_tensors='pt')
-    #    output = model.generate(input_ids, max_length=128, num_return_sequences=1, temperature=0.7)
-
-    #    # Decode the generated question
-    #    generated_question = tokenizer.decode(output[0], skip_special_tokens=True)
-
-    #    print('Response:', generated_question)
-
-
+    # Save the prompts and outputs
+    outputs['prompts'] = prompts
+    pd.DataFrame(outputs).to_csv('test.csv')

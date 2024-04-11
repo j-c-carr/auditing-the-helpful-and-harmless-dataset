@@ -23,6 +23,7 @@ def get_prompts(dset_name: str, split='train', cache_dir=None, data_dir=None, nu
         # Assumes that fairprism_aggregated.csv is in :cache_dir:
         import pandas as pd
         prompts = pd.read_csv(f'{cache_dir}/fairprism_aggregated.csv')['Human Input'].tolist()
+        prompts = list(set(prompts))    # Remove duplicate prompts
 
     elif dset_name == "xstest":
         # Assumes that xstest prompts are in :cache_dir:
