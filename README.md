@@ -23,3 +23,4 @@ pip install -r requirements.txt
 ```
 python inference.py
 ```
+Inside `inference.py`, you can set variables to load different datasets (by changing `dset_name` and the `cache_dir`) and different models (by adding models and model weights in the `models` dictionary). The outputs of the model and their toxicity will be saved to a csv file (see the last line of `inference.py`).
