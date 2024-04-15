@@ -70,11 +70,12 @@ if __name__=='__main__':
     # :cache_dir: is the folder containing the dataset. For rtp and hh, set this equal to the hugging face cache
     # folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
     # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
-    dset_name = 'rtp'
+    dset_name = 'hh-harmless-only'
+    split = 'test'
     cache_dir = '/network/scratch/j/jonathan.colaco-carr/.cache/jonathan.colaco-carr'
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    num_samples = 64 # if None, use the full dataset
+    num_samples = None # if None, use the full dataset
     batch_size = 64
     max_new_tokens = 32
 
@@ -89,14 +90,13 @@ if __name__=='__main__':
 
     # keys are the model name, values are the path to the model's weights
     models = {'base_lm': None,
-              #'help_only_sft': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/helpful_only/sft_gpt2l_helpful_only_2024-04-04_06-22-25_policy.pt'
-              #'help_only_dpo': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/helpful_only/dpo_gpt2l_helpful_2024-04-04_07-03-17_policy.pt'
-              #'help_only_sft': '/path/to/help/only/dpo',
-              'hh_dpo': f'{checkpoint_dir}/test/gpt2l_dpo_gh_readme_params.pt'}
+              'help_only_dpo': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/helpful_only/dpo_gpt2l_helpful_2024-04-04_07-03-17_policy.pt',
+              'hh_filtered_dpo': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/all_filtered/gpt2l_dpo_all_filtered.pt',
+              'hh_full_dpo': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/hh_full/dpo_gpt2l_paper_params_2024-03-16_11-02-04_policy.pt'}
     ###############################################
 
     # Load the prompts
-    prompts = get_prompts(dset_name, num_samples=num_samples, cache_dir=cache_dir)
+    prompts = get_prompts(dset_name, split=split, num_samples=num_samples, cache_dir=cache_dir)
     prompt_dataloader = DataLoader(prompts, batch_size=batch_size, shuffle=False)  # DO NOT SHUFFLE!
 
     # Load the base model
@@ -115,7 +115,7 @@ if __name__=='__main__':
 
         # Add instruction format for fine-tuned models
         # HH dataset already has the proper instruction format
-        if (model_checkpoint is not None) and (dset_name != 'hh'):
+        if (model_checkpoint is not None) and ('hh' not in dset_name):
             instruction_format = True
         else:
             instruction_format = False
@@ -136,4 +136,4 @@ if __name__=='__main__':
 
     # Save the prompts and outputs
     outputs['prompts'] = prompts
-    pd.DataFrame(outputs).to_csv('test.csv')
+    pd.DataFrame(outputs).to_csv(f'gpt2l_{dset_name}_toxicity.csv')
