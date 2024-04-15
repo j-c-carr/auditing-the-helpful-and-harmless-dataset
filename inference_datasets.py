@@ -87,6 +87,15 @@ def get_prompts(dset_name: str, split='train', cache_dir=None, data_dir=None, nu
 
     return prompts[:num_samples]
 
+def get_prompts_from_csv(filename: str, prompt_col_name: str, num_samples: Optional[int] = None) -> List[str]:
+    """Loads prompts from a csv file"""
+    assert filename.endswith(".csv"), 'filename must end with .csv'
+    import pandas as pd
+
+    prompts = pd.read_csv(filename)[prompt_col_name].tolist()
+
+    return prompts[:num_samples]
+
 def add_instruction_format(prompts: List[str], dset_name=None) -> List[str]:
     """For the fine-tuned models, format the prompts as they are formatted in the Anthropic HH dataset."""
     if dset_name == 'xstest':
