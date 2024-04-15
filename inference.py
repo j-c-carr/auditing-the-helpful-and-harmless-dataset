@@ -49,7 +49,7 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
 
         # Add "Human: ... Assistant: ..." for models fine-tuned on Helpful-Harmless dataset
         if instruction_format:
-            batch_prompts = add_instruction_format(batch_prompts)
+            batch_prompts = add_instruction_format(batch_prompts, dset_name='xstest')
 
         inputs = tokenizer(batch_prompts, add_special_tokens=False, padding=True, return_tensors='pt').to(device)
         batch_outputs = model.generate(**inputs, **generate_kwargs)
@@ -70,13 +70,14 @@ if __name__=='__main__':
     # :cache_dir: is the folder containing the dataset. For rtp and hh, set this equal to the hugging face cache
     # folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
     # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
-    dset_name = 'hh-harmless-only'
+    dset_name = 'xstest'
     split = 'test'
-    cache_dir = '/network/scratch/j/jonathan.colaco-carr/.cache/jonathan.colaco-carr'
+    #cache_dir = '/network/scratch/j/jonathan.colaco-carr/.cache/jonathan.colaco-carr'
+    cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     num_samples = None # if None, use the full dataset
-    batch_size = 64
+    batch_size = 32
     max_new_tokens = 32
 
     base_model_name = 'gpt2-large'
@@ -86,13 +87,13 @@ if __name__=='__main__':
 
     ###############################################
     # Add models for inference here:
-    checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints"
+    checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/gpt2-large"
 
     # keys are the model name, values are the path to the model's weights
-    models = {'base_lm': None,
-              'help_only_dpo': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/helpful_only/dpo_gpt2l_helpful_2024-04-04_07-03-17_policy.pt',
-              'hh_filtered_dpo': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/all_filtered/gpt2l_dpo_all_filtered.pt',
-              'hh_full_dpo': f'{checkpoint_dir}/v1_checkpoints/gpt2-large/hh_full/dpo_gpt2l_paper_params_2024-03-16_11-02-04_policy.pt'}
+    models = {#'base_lm': None,
+              'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
+              'hh_filtered_dpo_longer': f'{checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
+              'hh_full_dpo_longer': f'{checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
     ###############################################
 
     # Load the prompts
@@ -136,4 +137,4 @@ if __name__=='__main__':
 
     # Save the prompts and outputs
     outputs['prompts'] = prompts
-    pd.DataFrame(outputs).to_csv(f'gpt2l_{dset_name}_toxicity.csv')
+    pd.DataFrame(outputs).to_csv(f'gpt2l_{dset_name}_with_toxicity.csv')

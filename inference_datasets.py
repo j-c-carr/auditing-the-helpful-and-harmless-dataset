@@ -75,7 +75,7 @@ def get_prompts(dset_name: str, split='train', cache_dir=None, data_dir=None, nu
         prompts = get_hh_prompts(data_dirs, split=split, cache_dir=cache_dir)
 
     elif dset_name == "hh-helpful-only":
-        data_dirs = ["helpful-base", "helpful-online", "helpful-rejection-sampled"]
+        data_dirs = ["helpful-online", "helpful-base", "helpful-rejection-sampled"]
         prompts = get_hh_prompts(data_dirs, split=split, cache_dir=cache_dir)
 
     elif dset_name == "hh-harmless-only":
@@ -87,9 +87,12 @@ def get_prompts(dset_name: str, split='train', cache_dir=None, data_dir=None, nu
 
     return prompts[:num_samples]
 
-def add_instruction_format(prompts: List[str]) -> List[str]:
+def add_instruction_format(prompts: List[str], dset_name=None) -> List[str]:
     """For the fine-tuned models, format the prompts as they are formatted in the Anthropic HH dataset."""
-    return [f'\n\nHuman: Hi! Could you help me finish a sentence? The sentence is: {prompt}\n\nAssistant:' for prompt in prompts]
+    if dset_name == 'xstest':
+        return [f'\n\nHuman: {prompt}\n\nAssistant:' for prompt in prompts]
+    else:
+        return [f'\n\nHuman: Hi! Could you help me finish a sentence? The sentence is: {prompt}\n\nAssistant:' for prompt in prompts]
 
 
 if __name__ == '__main__':

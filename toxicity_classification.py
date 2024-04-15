@@ -36,7 +36,7 @@ def classify_outputs(samples: List[str], batch_size, device='cpu', classifier_na
     else:
         toxicity_clf = pipeline("text-classification", model=classifier_name)
 
-    print('Generating outputs...')
+    print('Classifying toxicity of outputs...')
     toxicity_probs = []
     for batch in tqdm(dataloader):
         batch_scores = toxicity_clf(batch)
