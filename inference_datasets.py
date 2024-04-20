@@ -94,7 +94,7 @@ def get_prompts_from_csv(filename: str, prompt_col_name: str, num_samples: Optio
 
     prompts = pd.read_csv(filename)[prompt_col_name].tolist()
 
-    return prompts[:num_samples]
+    return [p[:1024] for p in prompts[:num_samples]]
 
 def add_instruction_format(prompts: List[str], dset_name=None) -> List[str]:
     """For the fine-tuned models, format the prompts as they are formatted in the Anthropic HH dataset."""
