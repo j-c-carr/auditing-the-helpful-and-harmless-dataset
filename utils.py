@@ -5,7 +5,7 @@ import re
 import pandas as pd
 from tqdm import tqdm
 from typing import List, Dict
-from datasets import load_dataset, concatenate_datasets
+from datasets import load_dataset, concatenate_datasets, DatasetDict
 
 def extract_hh_prompt_from_sample(prompt_and_response: str) -> str:
     """Extract the prompt from a prompt-response pair from the HH dataset."""
@@ -60,7 +60,9 @@ def get_hh_samples_with_id_terms(data_dir: List[str], split: str, cache_dir: str
 
     for sample in tqdm(dataset):
         for term in id_terms:
-            if term in sample['prompt'].lower():
+            # Todo: search for term in questions only
+            if f' {term}' in sample['prompt'].lower():
+                # Todo: search for white space before prompt
                     short_prompt = truncate_prompt(sample['prompt'], term)
                     if short_prompt not in samples_with_id_term['short_prompt']:
                         samples_with_id_term['prompt'].append(sample['prompt'])
@@ -69,6 +71,32 @@ def get_hh_samples_with_id_terms(data_dir: List[str], split: str, cache_dir: str
                         samples_with_id_term['rejected'].append(sample['rejected'])
 
     return samples_with_id_term
+
+def calculate_dataset_statistics(dataset: DatasetDict, tokenizer) -> Dict[str, float]:
+    """Output: avg. tokens in prompts, avg. tokens in responses (chosen and rejected),
+    number of samples, average number of turns in the prompt."""
+
+    def get_avg_turns(prompts: List[str]) -> float:
+        """Output: average number of turns in each string"""
+        total_turns = 0
+        for prompt in prompts:
+            total_turns += prompt.count('\n\nHuman:')
+
+        return total_turns / len(prompts)
+
+    def get_avg_tokens(samples: List[str], tokenizer) -> float:
+        """Calculates the average number of tokens in each string"""
+        total_tokens = 0
+        for sample in samples:
+            total_tokens += len(tokenizer(sample)['input_ids'])
+
+        return total_tokens / len(samples)
+
+    return {'n_samples': len(dataset),
+            'avg_prompt_tokens': get_avg_tokens(dataset['prompt'], tokenizer),
+            'avg_chosen_tokens': get_avg_tokens(dataset['chosen'], tokenizer),
+            'avg_rejected_tokens': get_avg_tokens(dataset['rejected'], tokenizer),
+            'avg_prompt_turns': get_avg_turns(dataset['prompt'])}
 
 if __name__ == '__main__':
     data_dirs = ['helpful-base', 'helpful-online', 'helpful-rejection-sampled']
