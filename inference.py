@@ -4,7 +4,9 @@ import transformers
 import pandas as pd
 from torch.utils.data import DataLoader
 
-from inference_datasets import get_prompts, add_instruction_format
+from utils import (create_id_term_prompts, get_baseline_prompts, create_id_term_v2fact_prompts,
+get_factv2_baseline_prompts, get_factv3_baseline_prompts, create_id_term_v3fact_prompts,)
+from inference_datasets import get_prompts, add_instruction_format, get_prompts_from_csv
 from toxicity_classification import classify_outputs
 
 
@@ -49,7 +51,7 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
 
         # Add "Human: ... Assistant: ..." for models fine-tuned on Helpful-Harmless dataset
         if instruction_format:
-            batch_prompts = add_instruction_format(batch_prompts, dset_name='xstest')
+            batch_prompts = add_instruction_format(batch_prompts)
 
         inputs = tokenizer(batch_prompts, add_special_tokens=False, padding=True, return_tensors='pt').to(device)
         batch_outputs = model.generate(**inputs, **generate_kwargs)
@@ -70,7 +72,7 @@ if __name__=='__main__':
     # :cache_dir: is the folder containing the dataset. For rtp and hh, set this equal to the hugging face cache
     # folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
     # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
-    dset_name = 'xstest'
+    dset_name = 'fairprism'
     split = 'test'
     #cache_dir = '/network/scratch/j/jonathan.colaco-carr/.cache/jonathan.colaco-carr'
     cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
@@ -78,11 +80,11 @@ if __name__=='__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     num_samples = None # if None, use the full dataset
     batch_size = 32
-    max_new_tokens = 32
+    max_new_tokens = 80
 
-    base_model_name = 'gpt2-large'
+    base_model_name = 'gpt2-large'#'EleutherAI/pythia-2.8b'
 
-    classify_toxicity = True
+    classify_toxicity = False
     tox_clf_batch_size = 16     # use a different batch size for toxicity classifier
 
     ###############################################
@@ -92,12 +94,17 @@ if __name__=='__main__':
     # keys are the model name, values are the path to the model's weights
     models = {#'base_lm': None,
               'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
-              'hh_filtered_dpo_longer': f'{checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
+              #'hh_filtered_dpo_longer': f'{checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
               'hh_full_dpo_longer': f'{checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
+    #models = {#'base_lm': None,
+    #          'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
+    #          #'hh_filtered_dpo_longer': f'{checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
+    #          'hh_full_dpo_longer': f'{checkpoint_dir}/hh_full/dpo_pythia28_hh_full_2_epochs.pt'}
     ###############################################
 
     # Load the prompts
-    prompts = get_prompts(dset_name, split=split, num_samples=num_samples, cache_dir=cache_dir)
+    #prompts = get_prompts(dset_name, split=split, num_samples=num_samples, cache_dir=cache_dir)
+    prompts = create_id_term_v3fact_prompts() #create_id_term_prompts() #get_prompts_from_csv(dset_path, 'short_prompt')
     prompt_dataloader = DataLoader(prompts, batch_size=batch_size, shuffle=False)  # DO NOT SHUFFLE!
 
     # Load the base model
@@ -124,7 +131,7 @@ if __name__=='__main__':
         # Generate model outputs
         prompts, model_generations = inference_loop(model, tokenizer,
                                                     prompt_dataloader,
-                                                    instruction_format=instruction_format,
+                                                    instruction_format=False,
                                                     device=device,
                                                     max_new_tokens=max_new_tokens)
 
@@ -137,4 +144,4 @@ if __name__=='__main__':
 
     # Save the prompts and outputs
     outputs['prompts'] = prompts
-    pd.DataFrame(outputs).to_csv(f'gpt2l_{dset_name}_with_toxicity.csv')
+    pd.DataFrame(outputs).to_csv(f'gpt2l_factv3_prompts_{max_new_tokens}_tokens.csv')
