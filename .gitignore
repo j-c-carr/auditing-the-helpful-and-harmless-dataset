@@ -2,6 +2,8 @@ out/fairprism_eval/*
 !out/fairprism_eval/.gitkeep
 out/hh_eval/*
 !out/hh_eval/.gitkeep
+out/xstest_eval/*
+!out/xstest_eval/.gitkeep
 out/rtp_eval/*
 !out/rtp_eval/.gitkeep
 data/*
