@@ -1,18 +1,21 @@
+"""
+Main script for generating model outputs on a dataset of test prompts
+Author: @j-c-carr
+"""
 from tqdm import tqdm
 import torch
 import transformers
 import pandas as pd
 from torch.utils.data import DataLoader
 
-from utils import (create_id_term_prompts, get_baseline_prompts, create_id_term_v2fact_prompts,
-get_factv2_baseline_prompts, get_factv3_baseline_prompts, create_id_term_v3fact_prompts,)
-from inference_datasets import get_prompts, add_instruction_format, get_prompts_from_csv
+from inference_datasets import get_prompts, add_instruction_format
 from toxicity_classification import classify_outputs
 
 
 def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokenizer=False, device='cpu'):
     """Load a model and (optionally) a tokenizer for inference"""
-    assert name_or_path in ['gpt2-large', 'EleutherAI/pythia-2.8b'], "name_or_path must be in ['gpt2-large', 'EleutherAI/pythia-2.8b']"
+    assert name_or_path in ['gpt2-large', 'EleutherAI/pythia-2.8b'], \
+        "name_or_path must be in ['gpt2-large', 'EleutherAI/pythia-2.8b']"
 
     model = transformers.AutoModelForCausalLM.from_pretrained(name_or_path)
 
@@ -36,6 +39,7 @@ def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokeniz
         return tokenizer, model
 
     return model
+
 
 @torch.no_grad()
 def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instruction_format=False, **generate_kwargs):
@@ -67,34 +71,30 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
 
     return prompts, outputs 
 
-if __name__=='__main__':
 
-    # :cache_dir: is the folder containing the dataset. For rtp and hh, set this equal to the hugging face cache
-    # folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
+if __name__ == '__main__':
+
+    # :cache_dir: is the folder containing the dataset.
+    # For rtp and hh datasets, set this equal to the hugging face cache folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
     # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
     dset_name = 'fairprism'
     split = 'test'
-    #cache_dir = '/network/scratch/j/jonathan.colaco-carr/.cache/jonathan.colaco-carr'
     cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    num_samples = None # if None, use the full dataset
+    num_samples = None  # if None, use the full dataset
     batch_size = 32
     max_new_tokens = 80
 
-    base_model_name = 'gpt2-large'#'EleutherAI/pythia-2.8b'
-
-    classify_toxicity = False
-    tox_clf_batch_size = 16     # use a different batch size for toxicity classifier
+    base_model_name = 'gpt2-large'  # use 'EleutherAI/pythia-2.8b' for Pythia models
 
     ###############################################
     # Add models for inference here:
     checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/gpt2-large"
 
     # keys are the model name, values are the path to the model's weights
-    models = {#'base_lm': None,
-              'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
-              #'hh_filtered_dpo_longer': f'{checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
+    models = {'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
+              'hh_filtered_dpo_longer': f'{checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
               'hh_full_dpo_longer': f'{checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
     #models = {#'base_lm': None,
     #          'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
@@ -103,13 +103,13 @@ if __name__=='__main__':
     ###############################################
 
     # Load the prompts
-    #prompts = get_prompts(dset_name, split=split, num_samples=num_samples, cache_dir=cache_dir)
-    prompts = create_id_term_v3fact_prompts() #create_id_term_prompts() #get_prompts_from_csv(dset_path, 'short_prompt')
+    prompts = get_prompts(dset_name, split=split, num_samples=num_samples, cache_dir=cache_dir)
     prompt_dataloader = DataLoader(prompts, batch_size=batch_size, shuffle=False)  # DO NOT SHUFFLE!
 
     # Load the base model
     tokenizer, model = load_tokenizer_and_model(base_model_name, return_tokenizer=True, device=device)
 
+    # Generate outputs for each model
     outputs = {}
     for model_name, model_checkpoint in models.items():
         print('='*80)
@@ -121,8 +121,7 @@ if __name__=='__main__':
             model.load_state_dict(torch.load(model_checkpoint)['state'])
             print('Done.')
 
-        # Add instruction format for fine-tuned models
-        # HH dataset already has the proper instruction format
+        # Add instruction format if necessary
         if (model_checkpoint is not None) and ('hh' not in dset_name):
             instruction_format = True
         else:
@@ -136,11 +135,6 @@ if __name__=='__main__':
                                                     max_new_tokens=max_new_tokens)
 
         outputs[f'{model_name}_generations'] = model_generations
-
-        # Classify the toxicity of the model generations
-        if classify_toxicity:
-            toxicity_probs = classify_outputs(model_generations, tox_clf_batch_size, device=device)
-            outputs[f'{model_name}_generations_toxicity_probs'] = toxicity_probs
 
     # Save the prompts and outputs
     outputs['prompts'] = prompts
