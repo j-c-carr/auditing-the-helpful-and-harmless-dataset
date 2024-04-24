@@ -2,7 +2,7 @@
 This repository contains the code associated with our report for the McGill COMP 545 class.
 
 ## Dataset Audit
-...
+The labelled samples from the Harmless dataset are in `dataset_audit/df_labeledharmlessoutputs.csv`
 
 ## Model Training
 All models were trained using the [reference implementation](https://github.com/eric-mitchell/direct-preference-optimization) of DPO. Specifically, we forked their repository and followed the instructions in their README to train the Pythia 2.8B and GPT-2 large models.
