@@ -9,6 +9,6 @@ All models were trained using the [reference implementation](https://github.com/
 
 ## Model Evaluation
 The rest of the files in this repository are for generating and evaluating model outputs on a set of test prompts.
-* `inference.py` contains generating model outputs.
+* `inference.py` contains the main code to generate model outputs.
 * `analysis.ipynb` contains the results from our experiments on XSTest. The `out/xstest_eval` folder contains the generations from our models.
 * `inference.py` and `utils.py` help to load and process the datasets.
