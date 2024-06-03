@@ -98,7 +98,7 @@ def get_prompts_from_csv(filename: str, prompt_col_name: str, num_samples: Optio
 
 def add_instruction_format(prompts: List[str], dset_name=None) -> List[str]:
     """For the fine-tuned models, format the prompts as they are formatted in the Anthropic HH dataset."""
-    if dset_name == 'xstest':
+    if dset_name in ['fairprism', 'xstest']:
         return [f'\n\nHuman: {prompt}\n\nAssistant:' for prompt in prompts]
     else:
         return [f'\n\nHuman: Hi! Could you help me finish a sentence? The sentence is: {prompt}\n\nAssistant:' for prompt in prompts]

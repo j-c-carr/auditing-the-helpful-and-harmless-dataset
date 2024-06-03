@@ -32,9 +32,9 @@ def classify_outputs(samples: List[str], batch_size, device='cpu', classifier_na
     dataloader = DataLoader(samples, batch_size=batch_size, shuffle=False)  # Do NOT shuffle!
 
     if device != 'cpu':
-        toxicity_clf = pipeline("text-classification", model=classifier_name, device=0)
+        toxicity_clf = pipeline("text-classification", model=classifier_name, device=0, truncation=True)
     else:
-        toxicity_clf = pipeline("text-classification", model=classifier_name)
+        toxicity_clf = pipeline("text-classification", model=classifier_name, truncation=True)
 
     print('Classifying toxicity of outputs...')
     toxicity_probs = []
@@ -48,27 +48,18 @@ def classify_outputs(samples: List[str], batch_size, device='cpu', classifier_na
 
 if __name__ == '__main__':
 
-    output_df = pd.read_csv('out/fairprism_eval/fairprism_eval_v1.csv', encoding='ascii', encoding_errors='replace')
-    batch_size = 2
+    f_name = 'EleutherAI-pythia-2.8b_fairprism_prompts_80_tokens'
+    output_df = pd.read_csv(f'{f_name}.csv', index_col=0)
+    print(output_df.columns)
+    batch_size = 16
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(output_df.columns)
-    print(output_df.dtypes)
-    output_df = output_df.astype(str)
-    print(output_df.dtypes)
-    print(output_df['prompts'].astype(str).tolist())
-    exit(0)
-    output_df = output_df.drop(columns=[col for col in output_df.columns if col.startswith('Unnamed')])
-    print(output_df.columns)
-    for col in output_df.columns:
-        if col == 'prompts':
-            continue
-        col = 'ft_generations'
-        print('='*80)
-        print(f'{col} toxicity\n')
-        dataloader = DataLoader(output_df[col].tolist()[:8], batch_size=batch_size, shuffle=False)  # Do NOT shuffle!
-        toxicity_probs = classify_outputs(dataloader, device=device)
-        print(toxicity_probs)
 
-        output_df[f'{col}_toxicity_probs'] = toxicity_probs
+    print('Number of prompts: ', output_df['prompts'].shape[0])
+    # Get classify the toxicity of the prompts
+    prompts = output_df['prompts'].tolist()
+    toxicity_probs = classify_outputs(prompts, batch_size=16, device=device)
 
-    #output_df.to_csv('out/fairprism_eval/fairprism_eval_v1_with_tox.csv', index=False)
+    output_df[f'prompts_toxicity_probs'] = toxicity_probs
+    print(output_df.columns)
+
+    output_df.to_csv(f'{f_name}_v2.csv', index=False)
