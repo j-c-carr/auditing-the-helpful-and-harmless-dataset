@@ -1,25 +1,14 @@
-# hh_lhf_inference
-## Instructions
-### 1. Download the code and create a virtual environment on the Mila cluster 
-```
-# Log in to the Mila cluster and clone this repository
-ssh mila
-git clone https://github.com/j-c-carr/hh_lhf_inference.git
+# Auditing the Helpful and Harmless dataset
+This repository contains the code associated with our report for the McGill COMP 545 class.
 
-# Create an interactive session to test the model
-salloc --gres=gpu:1 --mem=32Gb --time=1:00:00
+## Dataset Audit
+The labelled samples from the Harmless dataset are in `dataset_audit/df_labeledharmlessoutputs.csv`
 
-# Create the virtual environment using python 3.8 and cuda 11.7
-module load python/3.8
-module load cuda/11.7
+## Model Training
+All models were trained using the [reference implementation](https://github.com/eric-mitchell/direct-preference-optimization) of DPO. Specifically, we forked their repository and followed the instructions in their README to train the Pythia 2.8B and GPT-2 large models.
 
-python -m venv venv
-source venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-### 2. Run `inference.py`
-```
-python inference.py
-```
+## Model Evaluation
+The rest of the files in this repository are for generating and evaluating model outputs on a set of test prompts.
+* `inference.py` contains the main code to generate model outputs.
+* `analysis.ipynb` contains the results from our experiments on XSTest. The `out/xstest_eval` folder contains the generations from our models.
+* `inference.py` and `utils.py` help to load and process the datasets.
