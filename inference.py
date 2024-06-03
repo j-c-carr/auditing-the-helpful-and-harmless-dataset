@@ -55,7 +55,7 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
 
         # Add "Human: ... Assistant: ..." for models fine-tuned on Helpful-Harmless dataset
         if instruction_format:
-            batch_prompts = add_instruction_format(batch_prompts)
+            batch_prompts = add_instruction_format(batch_prompts, dset_name='xstest')
 
         inputs = tokenizer(batch_prompts, add_special_tokens=False, padding=True, return_tensors='pt').to(device)
         batch_outputs = model.generate(**inputs, **generate_kwargs)
@@ -90,16 +90,17 @@ if __name__ == '__main__':
 
     ###############################################
     # Add models for inference here:
-    checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/gpt2-large"
+    checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/pythia28"
 
     # keys are the model name, values are the path to the model's weights
-    models = {'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
-              'hh_filtered_dpo_longer': f'{checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
-              'hh_full_dpo_longer': f'{checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
     #models = {#'base_lm': None,
-    #          'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
+    #          'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
     #          #'hh_filtered_dpo_longer': f'{checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
-    #          'hh_full_dpo_longer': f'{checkpoint_dir}/hh_full/dpo_pythia28_hh_full_2_epochs.pt'}
+    #          'hh_full_dpo_longer': f'{checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
+    models = {'base_lm': None,
+              'help_only': f'{checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
+              'hh_filtered': f'{checkpoint_dir}/all_filtered/dpo_pythia28_filtered_2024-04-16_step-160000_policy.pt',
+              'hh_full': f'{checkpoint_dir}/hh_full/dpo_pythia28_hh_full_1_epoch.pt'}
     ###############################################
 
     # Load the prompts
@@ -130,7 +131,7 @@ if __name__ == '__main__':
         # Generate model outputs
         prompts, model_generations = inference_loop(model, tokenizer,
                                                     prompt_dataloader,
-                                                    instruction_format=False,
+                                                    instruction_format=instruction_format,
                                                     device=device,
                                                     max_new_tokens=max_new_tokens)
 
@@ -138,4 +139,4 @@ if __name__ == '__main__':
 
     # Save the prompts and outputs
     outputs['prompts'] = prompts
-    pd.DataFrame(outputs).to_csv(f'gpt2l_factv3_prompts_{max_new_tokens}_tokens.csv')
+    pd.DataFrame(outputs).to_csv(f'{base_model_name.replace("/","-")}_{dset_name}_prompts_{max_new_tokens}_tokens.csv')
