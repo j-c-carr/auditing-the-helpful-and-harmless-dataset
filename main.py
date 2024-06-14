@@ -10,6 +10,11 @@ from torch.utils.data import DataLoader
 
 from inference_datasets import get_prompts, add_instruction_format
 
+from toxicity_classifier import classify_outputs
+
+import gc
+gc.collect()
+torch.cuda.empty_cache()
 
 def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokenizer=False, device='cpu'):
     """Load a model and (optionally) a tokenizer for inference"""
@@ -58,15 +63,14 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
 
         inputs = tokenizer(batch_prompts, add_special_tokens=False, padding=True, return_tensors='pt').to(device)
         batch_outputs = model.generate(**inputs, **generate_kwargs)
+        outputs.extend([batch_outputs[i, inputs['input_ids'].shape[1]:] for i in range(len(batch_outputs))])
 
-        outputs.extend([batch_outputs[i, inputs['input_ids'].shape[1]:] for i in range(len(batch_prompts))])
     print('Done.')
 
-    # Todo: decode outputs
     print('Decoding outputs...')
     for i in range(len(outputs)):
         outputs[i] = tokenizer.decode(outputs[i], skip_special_tokens=True)
-    print('Done.')
+    print(len(outputs))
 
     return prompts, outputs 
 
@@ -76,16 +80,20 @@ if __name__ == '__main__':
     # :cache_dir: is the folder containing the dataset.
     # For rtp and hh datasets, set this equal to the hugging face cache folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
     # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
-    dset_name = 'xstest'
-    split = 'test'
-    cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
+    dset_name = 'rtp'
+    split = 'train' # must be "train" for rtp
+    #cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/fairprism'
+    cache_dir = None 
+
+    classify_toxicity = False
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    num_samples = 32  # if None, use the full dataset
+    num_samples = 32 # if None, use the full dataset
     batch_size = 32
+    num_return_sequences = 3
     generator_kwargs = {"max_new_tokens": 50,
-                        "num_return_sequences": 5,
                         "do_sample": True,
+                        "num_return_sequences": num_return_sequences,
                         "top_k": 50,
                         "top_p": 0.95}
 
@@ -99,17 +107,18 @@ if __name__ == '__main__':
     gpt_models = {'base_lm': None,
               'help_only': f'{gpt_checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
               'hh_filtered': f'{gpt_checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
-              'hh_harmless': f'',
+              'hh_harmless': f'{gpt_checkpoint_dir}/hh_harmless_harmless/gpt2l_dpo_harmless_harmless_Jun13.pt',
               'hh_full': f'{gpt_checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
 
-    pythia_models = {'base_lm': None,
+    pythia_models = {
+              'hh_harmless': f'{pythia_checkpoint_dir}/hh_harmless_harmless/hh_dpo_pythia28_harmless_harmless_Jun14_1epoch.pt',
+              'base_lm': None,
               'help_only': f'{pythia_checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
               'hh_filtered': f'{pythia_checkpoint_dir}/all_filtered/dpo_pythia28_filtered_2024-04-16_step-160000_policy.pt',
-              'hh_harmless': f"",
               'hh_full': f'{pythia_checkpoint_dir}/hh_full/dpo_pythia28_hh_full_1_epoch.pt'}
 
 
-    base_model_name = 'gpt2-large'  # use 'EleutherAI/pythia-2.8b' for Pythia models
+    base_model_name = 'gpt2-large' # 'EleutherAI/pythia-2.8b'   # use 'EleutherAI/pythia-2.8b' for Pythia models
     models = gpt_models             # use pythia_models for Pythia models
     ###############################################
 
@@ -129,7 +138,12 @@ if __name__ == '__main__':
         # Load the model weights
         if model_checkpoint is not None:
             print(f'Loading model checkpoint from {model_checkpoint}...')
-            model.load_state_dict(torch.load(model_checkpoint)['state'])
+            # Convert the state dictionary to half precision
+            state_dict = torch.load(model_checkpoint)['state']
+            for key in tqdm(state_dict.keys()):
+                state_dict[key] = state_dict[key].half()
+
+            model.load_state_dict(state_dict)
             print('Done.')
 
         # Add instruction format if necessary
@@ -145,8 +159,15 @@ if __name__ == '__main__':
                                                     device=device,
                                                     **generator_kwargs)
 
+
         outputs[f'{model_name}_generations'] = model_generations
+
+        if classify_toxicity:
+            toxicity_scores = classify_outputs(model_generations,batch_size=batch_size)
+            outputs[f'{model_name}_toxicity'] = toxicity_scores 
+
+    prompts = [prompt for prompt in prompts for _ in range(num_return_sequences)]
 
     # Save the prompts and outputs
     outputs['prompts'] = prompts
-    pd.DataFrame(outputs).to_csv(f'{base_model_name.replace("/","-")}_{dset_name}_prompts_tokens.csv')
+    pd.DataFrame(outputs).to_csv(f'out/{dset_name}_eval/{base_model_name.replace("/","-")}_{dset_name}_{num_return_sequences}_sequences.csv')
