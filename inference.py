@@ -77,30 +77,39 @@ if __name__ == '__main__':
     # :cache_dir: is the folder containing the dataset.
     # For rtp and hh datasets, set this equal to the hugging face cache folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
     # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
-    dset_name = 'fairprism'
+    dset_name = 'xstest'
     split = 'test'
     cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    num_samples = None  # if None, use the full dataset
+    num_samples = 32  # if None, use the full dataset
     batch_size = 32
-    max_new_tokens = 80
+    generator_kwargs = {"max_new_tokens": 50,
+                        "num_return_sequences": 5,
+                        "do_sample": True,
+                        "top_k": 50,
+                        "top_p": 0.95}
 
     base_model_name = 'gpt2-large'  # use 'EleutherAI/pythia-2.8b' for Pythia models
 
     ###############################################
     # Add models for inference here:
-    checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/pythia28"
+    gpt_checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/gpt2-large"
+    pythia_checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/pythia28"
 
     # keys are the model name, values are the path to the model's weights
-    #models = {#'base_lm': None,
-    #          'help_only_dpo_longer': f'{checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
-    #          #'hh_filtered_dpo_longer': f'{checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
-    #          'hh_full_dpo_longer': f'{checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
-    models = {'base_lm': None,
-              'help_only': f'{checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
-              'hh_filtered': f'{checkpoint_dir}/all_filtered/dpo_pythia28_filtered_2024-04-16_step-160000_policy.pt',
-              'hh_full': f'{checkpoint_dir}/hh_full/dpo_pythia28_hh_full_1_epoch.pt'}
+    gpt_models = {'base_lm': None,
+              'help_only': f'{gpt_checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
+              'hh_filtered': f'{gpt_checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
+              'hh_harmless': f'{gpt_checkpoint_dir}/hh_harmless_harmless/gpt2l_dpo_harmless_harmless_Jun13.pt'
+              'hh_full': f'{gpt_checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
+    pythia_models = {'base_lm': None,
+              'help_only': f'{pythia_checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
+              'hh_filtered': f'{pythia_checkpoint_dir}/all_filtered/dpo_pythia28_filtered_2024-04-16_step-160000_policy.pt',
+              'hh_harmless': f""
+              'hh_full': f'{pythia_checkpoint_dir}/hh_full/dpo_pythia28_hh_full_1_epoch.pt'}
+
+    models = gpt_models
     ###############################################
 
     # Load the prompts
@@ -133,7 +142,7 @@ if __name__ == '__main__':
                                                     prompt_dataloader,
                                                     instruction_format=instruction_format,
                                                     device=device,
-                                                    max_new_tokens=max_new_tokens)
+                                                    **generator_kwargs)
 
         outputs[f'{model_name}_generations'] = model_generations
 
