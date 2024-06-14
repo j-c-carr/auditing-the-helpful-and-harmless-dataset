@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from inference_datasets import get_prompts, add_instruction_format
 
-from toxicity_classifier import classify_outputs
+from toxicity_classification import classify_outputs
 
 import gc
 gc.collect()
@@ -80,10 +80,9 @@ if __name__ == '__main__':
     # :cache_dir: is the folder containing the dataset.
     # For rtp and hh datasets, set this equal to the hugging face cache folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
     # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
-    dset_name = 'rtp'
+    dset_name = 'xstest'
     split = 'train' # must be "train" for rtp
-    #cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/fairprism'
-    cache_dir = None 
+    cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
 
     classify_toxicity = False
 
@@ -110,20 +109,24 @@ if __name__ == '__main__':
               'hh_harmless': f'{gpt_checkpoint_dir}/hh_harmless_harmless/gpt2l_dpo_harmless_harmless_Jun13.pt',
               'hh_full': f'{gpt_checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
 
-    pythia_models = {
+    pythia_models = {'base_lm': None,
               'hh_harmless': f'{pythia_checkpoint_dir}/hh_harmless_harmless/hh_dpo_pythia28_harmless_harmless_Jun14_1epoch.pt',
-              'base_lm': None,
               'help_only': f'{pythia_checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
               'hh_filtered': f'{pythia_checkpoint_dir}/all_filtered/dpo_pythia28_filtered_2024-04-16_step-160000_policy.pt',
               'hh_full': f'{pythia_checkpoint_dir}/hh_full/dpo_pythia28_hh_full_1_epoch.pt'}
 
 
-    base_model_name = 'gpt2-large' # 'EleutherAI/pythia-2.8b'   # use 'EleutherAI/pythia-2.8b' for Pythia models
-    models = gpt_models             # use pythia_models for Pythia models
+    base_model_name = 'EleutherAI/pythia-2.8b'  #'gpt2-large'   # use 'EleutherAI/pythia-2.8b' for Pythia models
+    models = pythia_models             # use pythia_models for Pythia models
     ###############################################
 
     # Load the prompts
     prompts = get_prompts(dset_name, split=split, num_samples=num_samples, cache_dir=cache_dir)
+
+    # Load custom prompts for XSTest
+    from xs_custom import disc_prompts, contrast_disc_prompts
+    prompts.extend(disc_prompts)
+    prompts.extend(contrast_disc_prompts)
     prompt_dataloader = DataLoader(prompts, batch_size=batch_size, shuffle=False)  # DO NOT SHUFFLE!
 
     # Load the base model
@@ -140,8 +143,8 @@ if __name__ == '__main__':
             print(f'Loading model checkpoint from {model_checkpoint}...')
             # Convert the state dictionary to half precision
             state_dict = torch.load(model_checkpoint)['state']
-            for key in tqdm(state_dict.keys()):
-                state_dict[key] = state_dict[key].half()
+            #for key in tqdm(state_dict.keys()):
+            #    state_dict[key] = state_dict[key].half()
 
             model.load_state_dict(state_dict)
             print('Done.')

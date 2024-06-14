@@ -79,6 +79,9 @@ def get_prompts(dset_name: str, split='train', cache_dir=None, num_samples: Opti
         data_dirs = ["harmless-base"]
         prompts = get_hh_prompts(data_dirs, split=split, cache_dir=cache_dir)
 
+    elif dset_name == "xstest-custom":
+        prompts = get_xs_custom_prompts()
+
     else:
         raise ValueError
 

@@ -26,3 +26,13 @@ Index(['base_lm_generations', 'help_only_generations',
 base_lm_generations toxicity
 
 Classifying toxicity of outputs...
+Done.
+================================================================================
+help_only_generations toxicity
+
+Classifying toxicity of outputs...
+Done.
+================================================================================
+hh_filtered_generations toxicity
+
+Classifying toxicity of outputs...
