@@ -9,7 +9,6 @@ import pandas as pd
 from torch.utils.data import DataLoader
 
 from inference_datasets import get_prompts, add_instruction_format
-from toxicity_classification import classify_outputs
 
 
 def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokenizer=False, device='cpu'):
@@ -90,7 +89,6 @@ if __name__ == '__main__':
                         "top_k": 50,
                         "top_p": 0.95}
 
-    base_model_name = 'gpt2-large'  # use 'EleutherAI/pythia-2.8b' for Pythia models
 
     ###############################################
     # Add models for inference here:
@@ -101,15 +99,18 @@ if __name__ == '__main__':
     gpt_models = {'base_lm': None,
               'help_only': f'{gpt_checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
               'hh_filtered': f'{gpt_checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
-              'hh_harmless': f'{gpt_checkpoint_dir}/hh_harmless_harmless/gpt2l_dpo_harmless_harmless_Jun13.pt'
+              'hh_harmless': f'',
               'hh_full': f'{gpt_checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
+
     pythia_models = {'base_lm': None,
               'help_only': f'{pythia_checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
               'hh_filtered': f'{pythia_checkpoint_dir}/all_filtered/dpo_pythia28_filtered_2024-04-16_step-160000_policy.pt',
-              'hh_harmless': f""
+              'hh_harmless': f"",
               'hh_full': f'{pythia_checkpoint_dir}/hh_full/dpo_pythia28_hh_full_1_epoch.pt'}
 
-    models = gpt_models
+
+    base_model_name = 'gpt2-large'  # use 'EleutherAI/pythia-2.8b' for Pythia models
+    models = gpt_models             # use pythia_models for Pythia models
     ###############################################
 
     # Load the prompts
@@ -148,4 +149,4 @@ if __name__ == '__main__':
 
     # Save the prompts and outputs
     outputs['prompts'] = prompts
-    pd.DataFrame(outputs).to_csv(f'{base_model_name.replace("/","-")}_{dset_name}_prompts_{max_new_tokens}_tokens.csv')
+    pd.DataFrame(outputs).to_csv(f'{base_model_name.replace("/","-")}_{dset_name}_prompts_tokens.csv')
