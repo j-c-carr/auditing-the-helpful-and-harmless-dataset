@@ -80,9 +80,10 @@ if __name__ == '__main__':
     # :cache_dir: is the folder containing the dataset.
     # For rtp and hh datasets, set this equal to the hugging face cache folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
     # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
-    dset_name = 'xstest'
+    dset_name = 'rtp'
     split = 'train' # must be "train" for rtp
-    cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
+    #cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
+    cache_dir = None
 
     classify_toxicity = False
 
@@ -123,10 +124,11 @@ if __name__ == '__main__':
     # Load the prompts
     prompts = get_prompts(dset_name, split=split, num_samples=num_samples, cache_dir=cache_dir)
 
-    # Load custom prompts for XSTest
-    from xs_custom import disc_prompts, contrast_disc_prompts
-    prompts.extend(disc_prompts)
-    prompts.extend(contrast_disc_prompts)
+    # Load custom prompts (for XSTest only)
+    #from xs_custom import disc_prompts, contrast_disc_prompts
+    #prompts.extend(disc_prompts)
+    #prompts.extend(contrast_disc_prompts)
+
     prompt_dataloader = DataLoader(prompts, batch_size=batch_size, shuffle=False)  # DO NOT SHUFFLE!
 
     # Load the base model
