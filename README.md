@@ -1,5 +1,5 @@
 # Auditing the Helpful and Harmless dataset
-This repository contains the code associated with our report for the McGill COMP 545 class.
+This repository contains the code associated with our manuscript, "Beyond the Safety Bundle: Auditing the Helpful and Harmless dataset"
 
 ## Dataset Audit
 The labelled samples from the manual evaluation of the harmless dataset are in `dataset_audit/df_labeledharmlessoutputs.csv`
