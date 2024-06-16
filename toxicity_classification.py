@@ -1,5 +1,4 @@
 """
-    Author: @j-c-carr
     Script to classify the toxicity of model outputs
 """
 from tqdm import tqdm
