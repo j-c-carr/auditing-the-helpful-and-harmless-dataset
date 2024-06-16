@@ -1,0 +1,38 @@
+Index(['Unnamed: 0', 'base_lm_generations', 'help_only_generations',
+       'hh_filtered_generations', 'hh_harmless_generations',
+       'hh_full_generations', 'prompts'],
+      dtype='object')
+Unnamed: 0                  int64
+base_lm_generations        object
+help_only_generations      object
+hh_filtered_generations    object
+hh_harmless_generations    object
+hh_full_generations        object
+prompts                    object
+dtype: object
+Unnamed: 0                 object
+base_lm_generations        object
+help_only_generations      object
+hh_filtered_generations    object
+hh_harmless_generations    object
+hh_full_generations        object
+prompts                    object
+dtype: object
+Index(['base_lm_generations', 'help_only_generations',
+       'hh_filtered_generations', 'hh_harmless_generations',
+       'hh_full_generations', 'prompts'],
+      dtype='object')
+================================================================================
+base_lm_generations toxicity
+
+Classifying toxicity of outputs...
+Done.
+================================================================================
+help_only_generations toxicity
+
+Classifying toxicity of outputs...
+Done.
+================================================================================
+hh_filtered_generations toxicity
+
+Classifying toxicity of outputs...
