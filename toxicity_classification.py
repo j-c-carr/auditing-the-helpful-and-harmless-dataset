@@ -2,6 +2,7 @@
     Author: @j-c-carr
     Script to classify the toxicity of model outputs
 """
+import sys
 from tqdm import tqdm
 import torch
 from typing import List
@@ -30,12 +31,17 @@ def get_toxicity_classifier(classifier_name="tomh/toxigen_roberta", device='cpu'
 def classify_outputs(samples: List[str], batch_size, device='cpu', classifier_name="tomh/toxigen_roberta"):
     """Classify model outputs using toxicity classifier"""
 
+    print("Creating dataloader...")
     dataloader = DataLoader(samples, batch_size=batch_size, shuffle=False)  # Do NOT shuffle!
+    print("Done")
 
+
+    print("Creating pipeline...")
     if device != 'cpu':
         toxicity_clf = pipeline("text-classification", model=classifier_name, device=0)
     else:
         toxicity_clf = pipeline("text-classification", model=classifier_name)
+    print("Done.")
 
     print('Classifying toxicity of outputs...')
     toxicity_probs = []
@@ -50,17 +56,25 @@ def classify_outputs(samples: List[str], batch_size, device='cpu', classifier_na
 
 if __name__ == '__main__':
 
-    output_df = pd.read_csv('out/rtp_eval/gpt2-large_rtp_3_sequences.csv', encoding='ascii', encoding_errors='replace')
+    fname = sys.argv[1]
+
+    
+    # Some datasets have invalid rows due to EOF characters in the generation
+    if fname == "out/rtp_eval/hh_full_Cor_pythia_rlhf_rtp_3_sequences.csv":
+        output_df = pd.read_csv(fname, skiprows=[47652], index_col=0)
+    elif fname == "out/rtp_eval/hh_harmless_Cor_EleutherAI-pythia-2.8b_rtp_3_sequences.csv":
+        output_df = pd.read_csv(fname, skiprows=[196794], index_col=0)
+    else:
+        output_df = pd.read_csv(fname, encoding='ascii', encoding_errors='replace', index_col=0)
+
     batch_size = 32
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(output_df.columns)
     print(output_df.dtypes)
     output_df = output_df.astype(str)
-    print(output_df.dtypes)
-    output_df = output_df.drop(columns=[col for col in output_df.columns if col.startswith('Unnamed')])
-    print(output_df.columns)
+    print(output_df.shape)
     for col in output_df.columns:
-        if "generations" not in col:
+        if "prompt" in col or "tox" in col:
             continue
         print('='*80)
         print(f'{col} toxicity\n')
@@ -68,5 +82,6 @@ if __name__ == '__main__':
 
         output_df[f'{col}_toxicity_probs'] = toxicity_probs
 
-    output_df.to_csv('out/rtp_eval/gpt2-large_3_sequences_with_tox.csv', index=False)
+    outf = fname[:-4] + "with_tox_clf.csv" 
+    output_df.to_csv(outf, index=False)
 
