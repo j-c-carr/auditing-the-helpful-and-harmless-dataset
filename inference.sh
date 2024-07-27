@@ -5,7 +5,6 @@
 #SBATCH --cpus-per-gpu=8
 #SBATCH --gres=gpu:1
 #SBATCH --time=1:30:00
-#SBATCH --mail-user=jonathan.colaco-carr@mila.quebec
 
 module load python/3.8
 module load cuda/11.7

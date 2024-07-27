@@ -1,6 +1,5 @@
 """
 Main script for generating model outputs on a dataset of test prompts
-Author: @j-c-carr
 """
 from tqdm import tqdm
 import torch

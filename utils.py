@@ -1,6 +1,5 @@
 """
 Utility script containing various helper functions
-Author: @j-c-carr
 """
 from typing import List, Dict, Tuple
 from datasets import DatasetDict
