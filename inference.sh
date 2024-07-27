@@ -4,7 +4,7 @@
 #SBATCH --mem=64Gb
 #SBATCH --cpus-per-gpu=8
 #SBATCH --gres=gpu:1
-#SBATCH --time=2:00:00
+#SBATCH --time=1:30:00
 #SBATCH --mail-user=jonathan.colaco-carr@mila.quebec
 
 module load python/3.8

@@ -70,7 +70,8 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
     print('Decoding outputs...')
     for i in range(len(outputs)):
         outputs[i] = tokenizer.decode(outputs[i], skip_special_tokens=True)
-    print(len(outputs))
+    print("Len prompts: ", prompts)
+    print("Len outputs: ", len(outputs))
 
     return prompts, outputs 
 
@@ -80,15 +81,15 @@ if __name__ == '__main__':
     # :cache_dir: is the folder containing the dataset.
     # For rtp and hh datasets, set this equal to the hugging face cache folder, e.g.'/network/scratch/j/jonathan.colaco-carr'
     # For FairPrism, or XSTest set :cache_dir: equal to the folder containing the dataset csv file
-    dset_name = 'rtp'
+    dset_name = 'xstest'
     split = 'train' # must be "train" for rtp
-    #cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
-    cache_dir = None
+    cache_dir = '/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
+    #cache_dir = None
 
     classify_toxicity = False
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    num_samples = 32 # if None, use the full dataset
+    num_samples = None # If None, use the full dataset
     batch_size = 32
     num_return_sequences = 3
     generator_kwargs = {"max_new_tokens": 50,
@@ -104,30 +105,32 @@ if __name__ == '__main__':
     pythia_checkpoint_dir = "/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/pythia28"
 
     # keys are the model name, values are the path to the model's weights
-    gpt_models = {'base_lm': None,
+    gpt_models = {#'base_lm': None,
               'help_only': f'{gpt_checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt',
               'hh_filtered': f'{gpt_checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt',
               'hh_harmless': f'{gpt_checkpoint_dir}/hh_harmless_harmless/gpt2l_dpo_harmless_harmless_Jun13.pt',
               'hh_full': f'{gpt_checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt'}
 
-    pythia_models = {'base_lm': None,
+    pythia_models = {#'base_lm': None,
               'hh_harmless': f'{pythia_checkpoint_dir}/hh_harmless_harmless/hh_dpo_pythia28_harmless_harmless_Jun14_1epoch.pt',
               'help_only': f'{pythia_checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt',
               'hh_filtered': f'{pythia_checkpoint_dir}/all_filtered/dpo_pythia28_filtered_2024-04-16_step-160000_policy.pt',
               'hh_full': f'{pythia_checkpoint_dir}/hh_full/dpo_pythia28_hh_full_1_epoch.pt'}
 
 
-    base_model_name = 'EleutherAI/pythia-2.8b'  #'gpt2-large'   # use 'EleutherAI/pythia-2.8b' for Pythia models
+    base_model_name = 'EleutherAI/pythia-2.8b' # 'gpt2-large' # use 'EleutherAI/pythia-2.8b' for Pythia models
     models = pythia_models             # use pythia_models for Pythia models
     ###############################################
 
     # Load the prompts
     prompts = get_prompts(dset_name, split=split, num_samples=num_samples, cache_dir=cache_dir)
+    print("Len XSTest Prompts: ", len(prompts))
 
     # Load custom prompts (for XSTest only)
-    #from xs_custom import disc_prompts, contrast_disc_prompts
-    #prompts.extend(disc_prompts)
-    #prompts.extend(contrast_disc_prompts)
+    if dset_name == 'xstest':
+        from xs_custom import disc_prompts, contrast_disc_prompts
+        prompts.extend(disc_prompts)
+        prompts.extend(contrast_disc_prompts)
 
     prompt_dataloader = DataLoader(prompts, batch_size=batch_size, shuffle=False)  # DO NOT SHUFFLE!
 
