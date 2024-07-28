@@ -59,5 +59,7 @@ id_terms = ["jewish", "gay", "african", "muslim", "asian",
              "queer", "bisexual", "latinx"]
 
 disc_prompts = [template(term) for term in id_terms for template in disc]
+disc_prompt_focus = [term for term in id_terms for _ in range(len(disc))]
 
 contrast_disc_prompts = [template(term) for term in id_terms for template in contrast_disc]
+contrast_disc_prompt_focus = [term for term in id_terms for _ in range(len(contrast_disc))]

@@ -2,7 +2,7 @@
 author: @j-c-carr
 python script to retrieve prompt datasets
 """
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datasets import load_dataset, concatenate_datasets
 
 
@@ -45,11 +45,13 @@ def get_hh_prompts(data_dirs: List[str], split: str, cache_dir: str = None) -> L
     return dataset['prompt']
 
 
-def get_prompts(dset_name: str, split='train', cache_dir=None, num_samples: Optional[int] = None) -> List[str]:
+def get_prompts(dset_name: str, split='train', cache_dir=None, num_samples: Optional[int] = None) -> Tuple[List[str]]:
     """Extracts prompts from the given dataset.
     If :num_samples: is supplied, returns the first :num_samples: samples from the dataset."""
-    assert dset_name in ["rtp", "hh",  "hh-helpful-only",  "hh-harmless-only", "fairprism", "xstest"], \
-        f'{dset_name} must be in ["rtp", "hh",  "hh-helpful-only", "hh-harmless-only", "fairprism", "xstest"]'
+    dsets = ["rtp", "hh",  "hh-helpful-only",  "hh-harmless-only", "fairprism", "xstest", "xstest-plus"]
+    assert dset_name in dsets, f'{dset_name} must be in {dsets}'
+
+    focus = []
 
     if dset_name == "rtp":
         print(f'Loading RealToxicityPrompts dataset from Huggingface...')
@@ -79,13 +81,22 @@ def get_prompts(dset_name: str, split='train', cache_dir=None, num_samples: Opti
         data_dirs = ["harmless-base"]
         prompts = get_hh_prompts(data_dirs, split=split, cache_dir=cache_dir)
 
-    elif dset_name == "xstest-custom":
-        prompts = get_xs_custom_prompts()
+    elif dset_name == "xstest-plus":
+        import pandas as pd
+        prompts = pd.read_csv(f'{cache_dir}/xstest_v2_prompts.csv')['prompt'].tolist()
+        focus = pd.read_csv(f'{cache_dir}/xstest_v2_prompts.csv')['focus'].tolist()
+
+        from xs_custom import disc_prompts, contrast_disc_prompts, contrast_disc_prompt_focus, disc_prompt_focus
+
+        prompts.extend(disc_prompts)
+        prompts.extend(contrast_disc_prompts)
+        focus.extend(disc_prompt_focus)
+        focus.extend(contrast_disc_prompt_focus)
 
     else:
         raise ValueError
 
-    return prompts[:num_samples]
+    return prompts[:num_samples], focus[:num_samples]
 
 
 def add_instruction_format(prompts: List[str], dset_name=None) -> List[str]:

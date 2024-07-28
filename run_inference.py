@@ -151,20 +151,9 @@ def main(args):
     """Main loop for performing inference"""
 
     # Load the prompts
-    if args.dset_name == 'xstest_plus':
-        # Append custom prompts for xstest_plus
-        prompts = get_prompts("xstest", split=args.dset_split,
-                              num_samples=args.num_samples,
-                              cache_dir=args.dset_dir)
-        from xs_custom import disc_prompts, contrast_disc_prompts
-
-        prompts.extend(disc_prompts)
-        prompts.extend(contrast_disc_prompts)
-
-    else:
-        prompts = get_prompts(args.dset_name, split=args.dset_split,
-                              num_samples=args.num_samples,
-                              cache_dir=args.dset_dir)
+    prompts, focus = get_prompts(args.dset_name, split=args.dset_split,
+                          num_samples=args.num_samples,
+                          cache_dir=args.dset_dir)
 
     prompt_dataloader = DataLoader(prompts, batch_size=args.batch_size,
                                    shuffle=False)  # DO NOT SHUFFLE!
@@ -196,6 +185,7 @@ def main(args):
                                                 device=args.device,
                                                 **args.generator_kwargs)
 
+    # Save the prompts and outputs
     outputs[f'{args.model_name}_generations'] = model_generations
 
     if args.classify_toxicity:
@@ -204,9 +194,13 @@ def main(args):
         outputs[f'{args.model_name}_toxicity'] = toxicity_scores
 
     prompts = [prompt for prompt in prompts for _ in range(args.num_return_sequences)]
-
-    # Save the prompts and outputs
     outputs['prompts'] = prompts
+
+    # Save the focus for XSTest
+    if len(focus) > 0:
+        focus = [f for f in focus for _ in range(args.num_return_sequences)]
+        outputs['focus'] = focus
+
     pd.DataFrame(outputs).to_csv(
         f'out/{args.dset_name}_eval/'
         f'{args.base_model_name.replace("/", "-")}_{args.model_name}'
