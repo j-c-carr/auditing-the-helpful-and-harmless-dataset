@@ -28,6 +28,14 @@ pythia_help_only="${pythia_checkpoint_dir}/helpful_only/dpo_pythia28_helpful_onl
 pythia_hh_filtered="${pythia_checkpoint_dir}/all_filtered/dpo_pythia28_filtered_2024-04-16_step-160000_policy.pt"
 pythia_hh_full="${pythia_checkpoint_dir}/hh_full/dpo_pythia28_hh_full_1_epoch.pt"
 
+# Mistral model checkpoints
+mistral_help_only="/network/scratch/j/jonathan.colaco-carr/logs/trl_test/4804526/final_checkpoint"
+mistral_hh_full_dpo="/network/scratch/j/jonathan.colaco-carr/logs/trl_test/4796852/final_checkpoint"
+
+# Llama model checkpoints
+llama_help_only_dpo="/network/scratch/j/jonathan.colaco-carr/logs/trl_test/4807943/final_checkpoint"
+llama_hh_full_dpo="/network/scratch/j/jonathan.colaco-carr/logs/trl_test/4802734/final_checkpoint"
+
 set -x
 
 # Dataset directories
