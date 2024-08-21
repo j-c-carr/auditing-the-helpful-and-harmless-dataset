@@ -34,8 +34,8 @@ class Args:
                                  default="base", help='Name of the model')
         # Prompt dataset args
         self.parser.add_argument('--dset_name', type=str,
-                                 default='xstest_plus',
-                                 choices=['xstest', 'xstest_plus', 'rtp'],
+                                 default='xstest-plus',
+                                 choices=['xstest', 'xstest-plus', 'rtp'],
                                  help='Model checkpoint. If None, generates with base model')
         self.parser.add_argument('--dset_split', type=str,
                                  default='train', choices=['train'],
@@ -121,12 +121,10 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
     """Use model and tokenizer to tokenizer"""
     model.eval()
 
-    prompts = []
     outputs = []
 
     print('Generating outputs...')
     for batch_prompts in tqdm(prompt_dataloader):
-        prompts.extend(batch_prompts)
 
         # Add "Human: ... Assistant: ..." for models fine-tuned on Helpful-Harmless dataset
         if instruction_format:
@@ -141,10 +139,9 @@ def inference_loop(model, tokenizer, prompt_dataloader, device='cpu', instructio
     print('Decoding outputs...')
     for i in range(len(outputs)):
         outputs[i] = tokenizer.decode(outputs[i], skip_special_tokens=True)
-    print("Len prompts: ", prompts)
     print("Len outputs: ", len(outputs))
 
-    return prompts, outputs 
+    return outputs 
 
 
 def main(args):
@@ -154,9 +151,9 @@ def main(args):
     prompts, focus = get_prompts(args.dset_name, split=args.dset_split,
                           num_samples=args.num_samples,
                           cache_dir=args.dset_dir)
-
+    # DO NOT SHUFFLE!
     prompt_dataloader = DataLoader(prompts, batch_size=args.batch_size,
-                                   shuffle=False)  # DO NOT SHUFFLE!
+                                   shuffle=False)
 
     # Load the base model
     tokenizer, model = load_tokenizer_and_model(args.base_model_name,
@@ -179,11 +176,11 @@ def main(args):
     # Generate model outputs
     outputs = {}
     print(f"Generating answers to {len(prompts)} prompts...")
-    prompts, model_generations = inference_loop(model, tokenizer,
-                                                prompt_dataloader,
-                                                instruction_format=instruction_format,
-                                                device=args.device,
-                                                **args.generator_kwargs)
+    model_generations = inference_loop(model, tokenizer,
+                                       prompt_dataloader,
+                                       instruction_format=instruction_format,
+                                       device=args.device,
+                                       **args.generator_kwargs)
 
     # Save the prompts and outputs
     outputs[f'{args.model_name}_generations'] = model_generations
@@ -211,8 +208,5 @@ if __name__ == '__main__':
 
     args = Args()
     args.parse()
-
-    # Set seed for model generations
-    transformers.set_seed(args.seed)
 
     main(args)

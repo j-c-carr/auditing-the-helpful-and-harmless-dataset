@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --output=logs/job-output-%j_pythia_xstest.txt
-#SBATCH --error=logs/job-error-%j_pythia_xstest.txt
+#SBATCH --output=logs/job-output-%j_gpt_xstest.txt
+#SBATCH --error=logs/job-error-%j_gpt_xstest.txt
 #SBATCH --mem=64Gb
 #SBATCH --cpus-per-gpu=8
 #SBATCH --gres=gpu:1
-#SBATCH --time=1:30:00
+#SBATCH --time=0:20:00
 
 module load python/3.8
 module load cuda/11.7
@@ -38,12 +38,11 @@ xstest_dset_dir='/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
 
 # Run inference
 python run_inference.py \
-  --base_model_name="EleutherAI/pythia-2.8b" \
-  --model_checkpoint=$pythia_hh_full \
+  --base_model_name="gpt2-large" \
+  --model_checkpoint=$gpt_hh_full \
   --model_name="hh_full" \
-  --dset_name="xstest_plus" \
+  --dset_name="xstest-plus" \
   --dset_dir=$xstest_dset_dir \
-  --seed=1 \
   --batch_size=32 \
   --num_return_sequences=3 \
   --top_p=0.95 \
