@@ -2,13 +2,15 @@
 Main script for generating model outputs on a dataset of test prompts
 """
 import argparse
+import os
 from tqdm import tqdm
 import torch
 import transformers
 import pandas as pd
 from torch.utils.data import DataLoader
-
+from peft import AutoPeftModelForCausalLM
 from inference_datasets import get_prompts, add_instruction_format
+from huggingface_hub import login
 
 from toxicity_classification import classify_outputs
 
@@ -25,41 +27,29 @@ class Args:
         # Model name and checkpoint
         self.parser.add_argument('--base_model_name', type=str,
                                  default="EleutherAI/pythia-2.8b",
-                                 choices=["EleutherAI/pythia-2.8b", 'gpt2-large'],
+                                 choices=["EleutherAI/pythia-2.8b", "gpt2-large", "meta-llama/Meta-Llama-3-8B", "mistralai/Mistral-7B-v0.1"],
                                  help='Base model name')
-        self.parser.add_argument('--model_checkpoint', type=str,
-                                 default=None,
+        self.parser.add_argument('--model_checkpoint', type=str, default=None,
                                  help='Model checkpoint. If None, generates with base model')
-        self.parser.add_argument('--model_name', type=str,
-                                 default="base", help='Name of the model')
+        self.parser.add_argument('--model_name', type=str, default="base", help='Name of the model')
         # Prompt dataset args
-        self.parser.add_argument('--dset_name', type=str,
-                                 default='xstest-plus',
+        self.parser.add_argument('--dset_name', type=str, default='xstest-plus',
                                  choices=['xstest', 'xstest-plus', 'rtp'],
                                  help='Model checkpoint. If None, generates with base model')
-        self.parser.add_argument('--dset_split', type=str,
-                                 default='train', choices=['train'],
+        self.parser.add_argument('--dset_split', type=str, default='train', choices=['train'],
                                  help="Prompt dataset split")
-        self.parser.add_argument('--num_samples', type=int,
-                                 default=None,
-                                 help="Number of prompts to evaluate. If None,"
-                                      "use the full prompt dataset")
-        self.parser.add_argument('--dset_dir', type=str,
-                                 default=None,
-                                 help="Directory of the dataset. For HuggingFace"
-                                      "datasets, if dset_dir is None then it "
+        self.parser.add_argument('--num_samples', type=int, default=None,
+                                 help="Number of prompts to evaluate. If None, use the full prompt dataset")
+        self.parser.add_argument('--dset_dir', type=str, default=None,
+                                 help="Directory of the dataset. For HuggingFace datasets, if dset_dir is None then it"
                                       "defaults to the $HF_DATASETS_CACHE")
         # Model inference args
-        self.parser.add_argument('--seed', type=int, default=1,
-                                 help='Random seed for model generations')
-        self.parser.add_argument('--batch_size', type=int, default=32,
-                                 help='Batch size for generations')
+        self.parser.add_argument('--seed', type=int, default=1, help='Random seed for model generations')
+        self.parser.add_argument('--batch_size', type=int, default=32, help='Batch size for generations')
         self.parser.add_argument('--num_return_sequences', type=int, default=1,
                                  help='Number of generations per prompt')
-        self.parser.add_argument('--top_p', type=float, default=0.95,
-                                 help='Param for top p filtering')
-        self.parser.add_argument('--top_k', type=int, default=50,
-                                 help='Param for top k filtering')
+        self.parser.add_argument('--top_p', type=float, default=0.95, help='Param for top p filtering')
+        self.parser.add_argument('--top_k', type=int, default=50, help='Param for top k filtering')
         self.parser.add_argument('--max_new_tokens', type=int, default=50,
                                  help='Max number of tokens per return sequence')
         self.parser.add_argument('--do_sample', action='store_true',
@@ -76,7 +66,7 @@ class Args:
         """Parse command line arguments and assign them as attributes."""
         args = self.parser.parse_args()
 
-        # Set each command line parameter as a class attribute
+        # Set each of the parser's attributes as class attributes
         for key, value in vars(args).items():
             setattr(self, key, value)
 
@@ -87,27 +77,34 @@ class Args:
                                  "top_k": args.top_k,
                                  "top_p": args.top_p}
 
-def load_tokenizer_and_model(name_or_path, model_checkpoint=None, return_tokenizer=False, device='cpu'):
+def load_tokenizer_and_model(base_model_name, model_checkpoint=None, return_tokenizer=False, device='cpu'):
     """Load a model and (optionally) a tokenizer for inference"""
-    assert name_or_path in ['gpt2-large', 'EleutherAI/pythia-2.8b'], \
-        "name_or_path must be in ['gpt2-large', 'EleutherAI/pythia-2.8b']"
 
-    model = transformers.AutoModelForCausalLM.from_pretrained(name_or_path)
-
-    if model_checkpoint is not None:
-        print(f'Loading model checkpoint from {model_checkpoint}...')
-        model.load_state_dict(torch.load(model_checkpoint)['state'])
-        print('Done.')
+    # Load big models with Peft
+    if base_model_name in ["meta-llama/Meta-Llama-3-8B", "mistralai/Mistral-7B-v0.1"]:
+        model = AutoPeftModelForCausalLM.from_pretrained(model_checkpoint,  # directory of saved model
+                                                         low_cpu_mem_usage=True,
+                                                         torch_dtype=torch.float16,
+                                                         # load_in_4bit=True,
+                                                         is_trainable=False)
 
     else:
-        print(f'No model checkpoint specified. Loading default {name_or_path} model.')
+        model = transformers.AutoModelForCausalLM.from_pretrained(base_model_name)
 
-    device = torch.device(device)
-    model.to(device)
+        if model_checkpoint is not None:
+            print(f'Loading model checkpoint from {model_checkpoint}...')
+            model.load_state_dict(torch.load(model_checkpoint)['state'])
+            print('Done.')
+
+        else:
+            print(f'No model checkpoint specified. Loading base {base_model_name} model.')
+
+    model.to(torch.device(device))
 
     if return_tokenizer:
         print('Loading tokenizer...')
-        tokenizer = transformers.AutoTokenizer.from_pretrained(name_or_path, padding_side='left')
+        tokenizer = transformers.AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True,
+                                                               padding_side='left')
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id
 
@@ -148,24 +145,14 @@ def main(args):
     """Main loop for performing inference"""
 
     # Load the prompts
-    prompts, focus = get_prompts(args.dset_name, split=args.dset_split,
-                          num_samples=args.num_samples,
-                          cache_dir=args.dset_dir)
+    prompts, focus = get_prompts(args.dset_name, split=args.dset_split, num_samples=args.num_samples,
+                                 cache_dir=args.dset_dir)
     # DO NOT SHUFFLE!
-    prompt_dataloader = DataLoader(prompts, batch_size=args.batch_size,
-                                   shuffle=False)
+    prompt_dataloader = DataLoader(prompts, batch_size=args.batch_size, shuffle=False)
 
-    # Load the base model
-    tokenizer, model = load_tokenizer_and_model(args.base_model_name,
-                                                return_tokenizer=True,
-                                                device=args.device)
-
-    # Load the model weights
-    if args.model_checkpoint is not None:
-        print(f'Loading model checkpoint from {args.model_checkpoint}...')
-        state_dict = torch.load(args.model_checkpoint)['state']
-        model.load_state_dict(state_dict)
-        print('Done.')
+    # Load the tokenizer and model
+    tokenizer, model = load_tokenizer_and_model(args.base_model_name, model_checkpoint=args.model_checkpoint,
+                                                return_tokenizer=True, device=args.device)
 
     # Add instruction format to the prompts if necessary
     if (args.model_checkpoint is not None) and ('hh' not in args.dset_name):
@@ -176,11 +163,8 @@ def main(args):
     # Generate model outputs
     outputs = {}
     print(f"Generating answers to {len(prompts)} prompts...")
-    model_generations = inference_loop(model, tokenizer,
-                                       prompt_dataloader,
-                                       instruction_format=instruction_format,
-                                       device=args.device,
-                                       **args.generator_kwargs)
+    model_generations = inference_loop(model, tokenizer, prompt_dataloader, instruction_format=instruction_format,
+                                       device=args.device, **args.generator_kwargs)
 
     # Save the prompts and outputs
     outputs[f'{args.model_name}_generations'] = model_generations
@@ -198,10 +182,8 @@ def main(args):
         focus = [f for f in focus for _ in range(args.num_return_sequences)]
         outputs['focus'] = focus
 
-    pd.DataFrame(outputs).to_csv(
-        f'out/{args.dset_name}_eval/'
-        f'{args.base_model_name.replace("/", "-")}_{args.model_name}'
-        f'_{args.dset_name}_{args.num_return_sequences}_sequences.csv')
+    pd.DataFrame(outputs).to_csv('out/{args.dset_name}_eval/{args.base_model_name.replace("/", "-")}_{args.model_name}'
+                                 f'_{args.dset_name}_{args.num_return_sequences}_sequences.csv')
 
 
 if __name__ == '__main__':
@@ -209,4 +191,6 @@ if __name__ == '__main__':
     args = Args()
     args.parse()
 
+    # HF_TOKEN environment variable must be set to a hugging face access token
+    login(token=os.environ["HF_TOKEN"])
     main(args)
