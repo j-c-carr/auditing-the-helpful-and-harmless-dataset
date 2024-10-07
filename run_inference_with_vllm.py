@@ -14,6 +14,8 @@ from huggingface_hub import login
 
 from toxicity_classification import classify_outputs
 
+import vllm
+
 import gc
 gc.collect()
 torch.cuda.empty_cache()
@@ -152,23 +154,36 @@ def main(args):
     prompt_dataloader = DataLoader(prompts, batch_size=args.batch_size, shuffle=False)
 
     # Load the tokenizer and model
-    tokenizer, model = load_tokenizer_and_model(args.base_model_name, model_checkpoint=args.model_checkpoint,
-                                                return_tokenizer=True, device=args.device)
+    #tokenizer, model = load_tokenizer_and_model(args.base_model_name, model_checkpoint=args.model_checkpoint,
+    #                                            return_tokenizer=True, device=args.device)
+    model = vllm.LLM(model=args.model_checkpoint)
 
-    # Add instruction format to the prompts if necessary
-    if (args.model_checkpoint is not None) and ('hh' not in args.dset_name):
-        instruction_format = True
-    else:
+    # Add instruction format to the prompts if necessary. Since the prompts in the hh dataset are already formated as
+    # questions, we don't change them
+    if 'hh' in args.dset_name:
         instruction_format = False
+    else:
+        instruction_format = True 
 
-    # Generate model outputs
-    outputs = {}
-    print(f"Generating answers to {len(prompts)} prompts...")
-    model_generations = inference_loop(model, tokenizer, prompt_dataloader, instruction_format=instruction_format,
-                                       device=args.device, **args.generator_kwargs)
+    print("TODO: ADD INSTRUCTION FORMAT")
+    model_generations = model.generate(
+        [
+            prompt for prompt in prompts
+            for _ in range(num_return_sequences)
+        ],
+        vllm.SamplingParams(top_p=args.top_p,
+                            top_k=args.top_k,
+                            max_tokens=args.max_new_tokens,
+                            seed=args.seed))
+    model_generations_edited = [
+        o.outputs[0].text for o in model_generations
+    ]
+    print('original model generations size:', len(model_generations))
+    print("...generations done")
+    print('total num of model generations:', len(model_generations_edited))
 
-    # Save the prompts and outputs
-    outputs[f'{args.model_name}_generations'] = model_generations
+    outputs[f'{args.model_name}_generations'] = model_generations_edited
+
 
     if args.classify_toxicity:
         toxicity_scores = classify_outputs(model_generations,
