@@ -166,10 +166,11 @@ def main(args):
         instruction_format = True 
 
     print("TODO: ADD INSTRUCTION FORMAT")
+    outputs = {}
     model_generations = model.generate(
         [
             prompt for prompt in prompts
-            for _ in range(num_return_sequences)
+            for _ in range(args.num_return_sequences)
         ],
         vllm.SamplingParams(top_p=args.top_p,
                             top_k=args.top_k,
