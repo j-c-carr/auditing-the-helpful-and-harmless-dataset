@@ -1,5 +1,5 @@
 # Auditing the Helpful and Harmless dataset
-This repository contains the code associated with our NAACL 2025 paper, ["Beyond the Safety Bundle: Auditing the Helpful and Harmless dataset"](https://arxiv.org/abs/2411.08243).
+This repository contains the code associated with our paper, ["Beyond the Safety Bundle: Auditing the Helpful and Harmless dataset"](https://arxiv.org/abs/2411.08243).
 
 ## Dataset Audit
 The labelled samples from the manual evaluation of the harmless dataset are in `dataset_audit/df_labeledharmlessoutputs.csv`. Results from the second round of labelling are in `dataset_audit/df_labeledharmlessoutputs_second_round.csv` 
