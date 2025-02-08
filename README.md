@@ -5,7 +5,7 @@ This repository contains the code associated with our manuscript, "Beyond the Sa
 The labelled samples from the manual evaluation of the harmless dataset are in `dataset_audit/df_labeledharmlessoutputs.csv`
 
 ## Model Training
-All models were trained using the [reference implementation](https://github.com/eric-mitchell/direct-preference-optimization) of DPO. Specifically, we forked their repository and followed the instructions in their README to train the Pythia 2.8B and GPT-2 large models.
+All models were trained using the [reference implementation](https://github.com/eric-mitchell/direct-preference-optimization) of DPO. Specifically, we forked their repository and followed the instructions in their README to train the Pythia 2.8B, GPT-2 and OPT 2.7 language models.
 
 ## Model Evaluation
 The rest of the files in this repository are for generating and evaluating model outputs on a set of test prompts.
