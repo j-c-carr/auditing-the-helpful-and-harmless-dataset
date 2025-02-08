@@ -5,10 +5,22 @@ import sys
 from tqdm import tqdm
 import torch
 from typing import List
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader
 from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer
 
 import pandas as pd
+
+class SampleDataset(Dataset):
+    """Custom dataset for text classification."""
+
+    def __init__(self, samples: List[str]):
+        self.samples = samples
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        return self.samples[idx]
 
 
 def get_toxicity_classifier(classifier_name="tomh/toxigen_roberta", device='cpu'):
@@ -30,26 +42,39 @@ def get_toxicity_classifier(classifier_name="tomh/toxigen_roberta", device='cpu'
 def classify_outputs(samples: List[str], batch_size, device='cpu', classifier_name="tomh/toxigen_roberta"):
     """Classify model outputs using toxicity classifier"""
 
-    print("Creating dataloader...")
-    dataloader = DataLoader(samples, batch_size=batch_size, shuffle=False)  # Do NOT shuffle!
-    print("Done")
+    # Load the tokenizer and model
+    tokenizer = AutoTokenizer.from_pretrained(classifier_name)
+    model = AutoModelForSequenceClassification.from_pretrained(classifier_name).to(device)
 
+    print("Creating dataset...")
+    dataset = SampleDataset(samples)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    print("Done creating dataset.")
 
-    print("Creating pipeline...")
-    if device != 'cpu':
-        toxicity_clf = pipeline("text-classification", model=classifier_name, device=0)
-    else:
-        toxicity_clf = pipeline("text-classification", model=classifier_name)
-    print("Done.")
-
-    print('Classifying toxicity of outputs...')
+    model.eval()  # Set model to evaluation mode
     toxicity_probs = []
+
+    print("Classifying toxicity of outputs...")
     for batch in tqdm(dataloader):
-        batch_scores = toxicity_clf(batch)
-        toxicity_probs.extend([d['score'] if d['label'] == 'LABEL_1' else 1 - d['score'] for d in batch_scores])
+        # Tokenize the batch and move it to the appropriate device
+        encoded_batch = tokenizer(batch, padding=True, truncation=True, return_tensors="pt").to(device)
+
+        # Get model predictions
+        outputs = model(**encoded_batch)
+        scores = torch.softmax(outputs.logits, dim=-1).cpu().numpy()
+
+        # Extract probabilities for toxicity (assuming LABEL_1 is toxic)
+        toxicity_probs.extend([score[1] for score in scores])  # 'LABEL_1' corresponds to index 1
+
+    # Delete the classifier
+    del model
+    model = None
+    import gc
+    gc.collect()
+    torch.cuda.empty_cache()
+
 
     print('Done.')
-
     return toxicity_probs
 
 
@@ -66,7 +91,7 @@ if __name__ == '__main__':
     else:
         output_df = pd.read_csv(fname, encoding='ascii', encoding_errors='replace', index_col=0)
 
-    batch_size = 32
+    batch_size = 128
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(output_df.columns)
     print(output_df.dtypes)

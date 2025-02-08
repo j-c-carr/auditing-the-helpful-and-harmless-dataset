@@ -48,8 +48,6 @@ def get_hh_prompts(data_dirs: List[str], split: str, cache_dir: str = None) -> L
 def get_prompts(dset_name: str, split='train', cache_dir=None, num_samples: Optional[int] = None) -> Tuple[List[str]]:
     """Extracts prompts from the given dataset.
     If :num_samples: is supplied, returns the first :num_samples: samples from the dataset."""
-    dsets = ["rtp", "hh",  "hh-helpful-only",  "hh-harmless-only", "fairprism", "xstest", "xstest-plus"]
-    assert dset_name in dsets, f'{dset_name} must be in {dsets}'
 
     focus = []
 
@@ -57,6 +55,10 @@ def get_prompts(dset_name: str, split='train', cache_dir=None, num_samples: Opti
         print(f'Loading RealToxicityPrompts dataset from Huggingface...')
         dataset = load_dataset('allenai/real-toxicity-prompts', split=split, cache_dir=cache_dir)
         prompts = [prompt['text'] for prompt in dataset['prompt']]
+        focus = {}
+        for k in ['toxicity', 'threat', 'insult', 'severe_toxicity', 'profanity', 'sexually_explicit',
+                'identity_attack', 'flirtation']:
+            focus[k] = [prompt[k] for prompt in dataset['prompt'][:num_samples]]
 
     elif dset_name == "fairprism":
         # Assumes that fairprism_aggregated.csv is in :cache_dir:
@@ -68,6 +70,8 @@ def get_prompts(dset_name: str, split='train', cache_dir=None, num_samples: Opti
         # Assumes that the xstest prompts are in :cache_dir:
         import pandas as pd
         prompts = pd.read_csv(f'{cache_dir}/xstest_v2_prompts.csv')['prompt'].tolist()
+        focus = pd.read_csv(f'{cache_dir}/xstest_v2_prompts.csv')['focus'].tolist()
+        focus = focus[:num_samples]
 
     elif dset_name == "hh":
         data_dirs = ["helpful-base", "harmless-base", "helpful-online", "helpful-rejection-sampled"]
@@ -81,28 +85,34 @@ def get_prompts(dset_name: str, split='train', cache_dir=None, num_samples: Opti
         data_dirs = ["harmless-base"]
         prompts = get_hh_prompts(data_dirs, split=split, cache_dir=cache_dir)
 
-    elif dset_name == "xstest-plus":
-        import pandas as pd
-        prompts = pd.read_csv(f'{cache_dir}/xstest_v2_prompts.csv')['prompt'].tolist()
-        focus = pd.read_csv(f'{cache_dir}/xstest_v2_prompts.csv')['focus'].tolist()
-
+    elif dset_name == "xs-id-terms":
+        prompts = []
+        focus = {"term": [], "type": []}
         from xs_custom import disc_prompts, contrast_disc_prompts, contrast_disc_prompt_focus, disc_prompt_focus
 
         prompts.extend(disc_prompts)
+        focus["term"].extend(disc_prompt_focus)
+        focus["type"].extend(["disc" for _ in range(len(disc_prompt_focus))])
+
         prompts.extend(contrast_disc_prompts)
-        focus.extend(disc_prompt_focus)
-        focus.extend(contrast_disc_prompt_focus)
+        focus["term"].extend(contrast_disc_prompt_focus)
+        focus["type"].extend(["contrast_disc" for _ in range(len(contrast_disc_prompt_focus))])
+
+        focus["term"] = focus["term"][:num_samples]
+        focus["type"] = focus["type"][:num_samples]
 
     else:
         raise ValueError
 
-    return prompts[:num_samples], focus[:num_samples]
+    return prompts[:num_samples], focus
 
 
 def add_instruction_format(prompts: List[str], dset_name=None) -> List[str]:
     """For the fine-tuned models, format the prompts as they are formatted in the Anthropic HH dataset."""
-    if dset_name in ['fairprism', 'xstest']:
+    if dset_name in ['fairprism', 'xstest', 'xstest-plus', 'xs-id-terms']:
         return [f'\n\nHuman: {prompt}\n\nAssistant:' for prompt in prompts]
+    elif dset_name == 'rtp':
+        return [f'\n\nHuman: Hi! Could you help me finish a sentence? The sentence is: {prompt}\n\nAssistant:' for prompt in prompts]
     else:
-        return [f'\n\nHuman: Hi! Could you help me finish a sentence? The sentence is: {prompt}\n\nAssistant:'
-                for prompt in prompts]
+        print("No formatting added to prompts.")
+        return prompts

@@ -33,7 +33,6 @@ class Args:
         self.parser.add_argument('--model_name', type=str, default="base", help='Name of the model')
         # Prompt dataset args
         self.parser.add_argument('--dset_name', type=str, default='rtp',
-                                 choices=['xstest', 'xstest-plus', 'rtp'],
                                  help='Model checkpoint. If None, generates with base model')
         self.parser.add_argument('--dset_split', type=str, default='train', choices=['train'],
                                  help="Prompt dataset split")
@@ -43,7 +42,6 @@ class Args:
                                  help="Directory of the dataset. For HuggingFace datasets, if dset_dir is None then it"
                                       "defaults to the $HF_DATASETS_CACHE")
         # Model inference args
-        self.parser.add_argument('--seed', type=int, default=1, help='Random seed for model generations')
         self.parser.add_argument('--batch_size', type=int, default=32, help='Batch size for generations')
         self.parser.add_argument('--num_return_sequences', type=int, default=1,
                                  help='Number of generations per prompt')
@@ -74,19 +72,29 @@ def main(args):
     # Load the prompts
     _prompts, focus = get_prompts(args.dset_name, split=args.dset_split, num_samples=args.num_samples,
                                  cache_dir=args.dset_dir)
+    _ids = [i for i in range(len(_prompts))]
     prompts = [prompt for prompt in _prompts for _ in range(args.num_return_sequences)]
+    prompt_ids = [_id for _id in _ids for _ in range(args.num_return_sequences)]
 
     # Add instruction format to the prompts
     formatted_prompts = add_instruction_format(prompts, dset_name=args.dset_name)
 
     # Generate outputs
     outputs = {}
-    model = vllm.LLM(model=args.model_checkpoint)
+    if "orpo_gpt2" in args.model_checkpoint:
+        #from transformers import AutoTokenizer
+        #tokenizer = AutoTokenizer.from_pretrained()
+        model = vllm.LLM(model=args.model_checkpoint, tokenizer="openai-community/gpt2-large")
+    if "orpo_pythia2" in args.model_checkpoint:
+        #from transformers import AutoTokenizer
+        #tokenizer = AutoTokenizer.from_pretrained()
+        model = vllm.LLM(model=args.model_checkpoint, tokenizer="EleutherAI/pythia-2.8b")
+    else:
+        model = vllm.LLM(model=args.model_checkpoint)
     model_generations = model.generate(formatted_prompts,
         vllm.SamplingParams(top_p=args.top_p,
                             temperature=args.temperature,
-                            max_tokens=args.max_new_tokens,
-                            seed=args.seed))
+                            max_tokens=args.max_new_tokens))
     model_generations_edited = [
         o.outputs[0].text for o in model_generations
     ]
@@ -110,13 +118,16 @@ def main(args):
         outputs[f'{args.model_name}_toxicity'] = toxicity_scores
 
     outputs['prompts'] = prompts
+    outputs['prompt_ids'] = prompt_ids 
 
     # Save the focus for XSTest (for RTP, save the toxicity of the prompt)
     if len(focus) > 0:
-        focus = [f for f in focus for _ in range(args.num_return_sequences)]
-        if args.dset_name == "rtp":
-            outputs['prompt_toxicity'] = focus  # focus is prompt tox. for rtp
+        if args.dset_name in ["rtp", "xs-id-terms"]:
+            # Focus is a dict
+            for k, v in focus.items():
+                outputs[f'prompt_{k}'] = [val for val in v for _ in range(args.num_return_sequences)]
         else:
+            focus = [f for f in focus for _ in range(args.num_return_sequences)]
             outputs['focus'] = focus
 
     import os
@@ -138,6 +149,9 @@ if __name__ == '__main__':
 
     args = Args()
     args.parse()
+
+    gc.collect()
+    torch.cuda.empty_cache()
 
     # HF_TOKEN environment variable must be set to a hugging face access token
     login(token=os.environ["HF_TOKEN"])

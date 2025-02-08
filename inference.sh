@@ -1,40 +1,66 @@
 #!/bin/bash
-#SBATCH --output=logs/job-output-%j_gpt_xstest.txt
-#SBATCH --error=logs/job-error-%j_gpt_xstest.txt
+#SBATCH --output=logs/job-output-%j_pythia28_hh_full_orpo_rtp.txt
+#SBATCH --error=logs/job-error-%j_pythia28_hh_full_orpo_rtp.txt
 #SBATCH --mem=64Gb
 #SBATCH --cpus-per-gpu=8
 #SBATCH --gres=gpu:1
-#SBATCH --time=0:20:00
+#SBATCH --constraint=ampere
+#SBATCH --time=8:59:00
 
 module load python/3.8
 module load cuda/11.7
 
 
-# Activate the virtual environment (same as used for direct preference optimization)
-dpo_dir=$HOME/courses/c597/direct-preference-optimization
-source $dpo_dir/venv/bin/activate
+# Activate the virtual environment
+source $HOME/hh_lhf_training/venv/bin/activate
 
-# GPT-2 model checkpoints
-gpt_checkpoint_dir="/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/gpt2-large"
-gpt_help_only="${gpt_checkpoint_dir}/helpful_only/dpo_gpt2l_helpful_longer_2024-04-13_step-200000_policy.pt"
-gpt_hh_filtered="${gpt_checkpoint_dir}/all_filtered/gpt2l_dpo_filtered_longer_2024-04-14_step-280000_policy.pt"
-gpt_hh_harmless="${gpt_checkpoint_dir}/hh_harmless_harmless/gpt2l_dpo_harmless_harmless_Jun13.pt"
-gpt_hh_full="${gpt_checkpoint_dir}/hh_full/dpo_gpt2l_paper_params_longer_2024-04-13_step-240000_policy.pt"
+# For smaller models, use --mem=64Gb -cpus-per-gpu=8 --gres:gpu:1
+# For bigger models, use --mem=64Gb --cpus-per-gpu=8 --gres=gpu:2
 
-# Pythia model checkpoints
-pythia_checkpoint_dir="/network/scratch/j/jonathan.colaco-carr/hh_fruits/checkpoints/v1_checkpoints/pythia28"
-pythia_hh_harmless="${pythia_checkpoint_dir}/hh_harmless_harmless/hh_dpo_pythia28_harmless_harmless_Jun14_1epoch.pt"
-pythia_help_only="${pythia_checkpoint_dir}/helpful_only/dpo_pythia28_helpful_only_2024_04_16_step-160000.pt"
-pythia_hh_filtered="${pythia_checkpoint_dir}/all_filtered/dpo_pythia28_filtered_2024-04-16_step-160000_policy.pt"
-pythia_hh_full="${pythia_checkpoint_dir}/hh_full/dpo_pythia28_hh_full_1_epoch.pt"
+checkpoint_dir="$SCRATCH/hh_fruits/checkpoints/v1_checkpoints"
 
-# Mistral model checkpoints
-mistral_help_only="/network/scratch/j/jonathan.colaco-carr/logs/trl_test/4804526/final_checkpoint"
-mistral_hh_full_dpo="/network/scratch/j/jonathan.colaco-carr/logs/trl_test/4796852/final_checkpoint"
+# Pythia28 models
+pythia28_hh_full_1_epoch="$checkpoint_dir/pythia28/hh_full/pythia28_dpo_hh_full_1_epoch_5391350"
+pythia28_hh_full_2_epoch="$checkpoint_dir/pythia28/hh_full/pythia28_dpo_hh_full_2_epochs_5401460"
+pythia28_hh_filtered_1_epoch="$checkpoint_dir/pythia28/hh_filtered_v2/pythia_28_hh_filtered_1_epoch_5358431"
+pythia28_hh_filtered_2_epoch="$checkpoint_dir/pythia28/hh_filtered_v2/pythia_28_hh_filtered_2_epochs_5407249"
+pythia28_help_only_1_epoch="$checkpoint_dir/pythia28/helpful_only/pythia_28_dpo_help_only_1_epoch_5398290"
+pythia28_help_only_2_epoch="$checkpoint_dir/pythia28/helpful_only/pythia_28_help_only_2_epochs_5399975"
 
-# Llama model checkpoints
-llama_help_only_dpo="/network/scratch/j/jonathan.colaco-carr/logs/trl_test/4807943/final_checkpoint"
-llama_hh_full_dpo="/network/scratch/j/jonathan.colaco-carr/logs/trl_test/4802734/final_checkpoint"
+# GPT 2L models
+gpt2l_hh_full_1_epoch="$checkpoint_dir/gpt2-large/hh_full/hh_full_1_epoch_5391344"
+gpt2l_hh_full_2_epoch="$checkpoint_dir/gpt2-large/hh_full/hh_full_2_epochs_5401459"
+gpt2l_hh_filtered_1_epoch="$checkpoint_dir/gpt2-large/hh_filtered_v2/hh_filtered_1_epoch_5358427"
+gpt2l_hh_filtered_2_epoch="$checkpoint_dir/gpt2-large/hh_filtered_v2/hh_filtered_2_epochs_5407253"
+gpt2l_help_only_1_epoch="$checkpoint_dir/gpt2-large/helpful_only/help_only_1_epoch_5398287"
+gpt2l_help_only_2_epoch="$checkpoint_dir/gpt2-large/helpful_only/help_only_2_epochs_5399958"
+
+# OPT 2.7 models
+opt27_hh_full_2_epoch="$checkpoint_dir/opt27/hh_full/hh_full_2_epochs_5417691"
+opt27_hh_filtered_2_epoch="$checkpoint_dir/opt27/hh_filtered_v2/hh_filtered_2_epochs_5417692"
+opt27_help_only_2_epoch="$checkpoint_dir/opt27/helpful_only/help_only_2_epochs_5417652"
+
+#### ORPO #####
+# GPT 2L models
+gpt2l_hh_full_orpo="sert121/orpo_gpt2_hh_full-merged"
+gpt2l_hh_filtered_orpo="sert121/orpo_gpt2_hh_filtered-merged"
+gpt2l_help_only_orpo="sert121/orpo_gpt2_hh_helpful-merged"
+
+# Pythia 2.8 models
+pythia28_help_only_orpo="sert121/orpo_pythia2_hh_helpful-merged"
+pythia28_hh_full_orpo="sert121/orpo_pythia2_hh_full-merged"
+pythia28_hh_filtered_orpo="sert121/orpo_pythia2_hh_filtered-merged"
+
+
+# OPT 2 models
+opt27_help_only_orpo="sert121/orpo_opt_hh_helpful-merged"
+opt27_hh_full_orpo="sert121/orpo_opt_hh_full-merged"
+opt27_hh_filtered_orpo="sert121/orpo_opt_hh_filtered-merged"
+
+#### ---- #####
+
+# Hugging face access token is required for Mistral and Llama models
+export HF_TOKEN=$(<.hf_access_token)
 
 set -x
 
@@ -45,17 +71,14 @@ export HUGGINGFACE_HUB_CACHE=$SCRATCH/cache/huggingface/hub
 xstest_dset_dir='/network/scratch/j/jonathan.colaco-carr/hh_fruits/data/xstest'
 
 # Run inference
-python run_inference.py \
-  --base_model_name="gpt2-large" \
-  --model_checkpoint=$gpt_hh_full \
-  --model_name="hh_full" \
-  --dset_name="xstest-plus" \
-  --dset_dir=$xstest_dset_dir \
-  --batch_size=32 \
-  --num_return_sequences=3 \
-  --top_p=0.95 \
-  --top_k=50 \
-  --max_new_tokens=50 \
-  --do_sample
-
+python inference.py \
+  --base_model_name="pythia28" \
+  --model_checkpoint=$pythia28_hh_full_orpo \
+  --model_name="pythia28_hh_full_orpo" \
+  --dset_name="rtp" \
+  --batch_size=128 \
+  --num_return_sequences=25 \
+  --top_p=0.9 \
+  --temperature=1.0 \
+  --max_new_tokens=50
 
