@@ -1,5 +1,5 @@
 # Auditing the Helpful and Harmless dataset
-This repository contains the code associated with our paper, ["Beyond the Safety Bundle: Auditing the Helpful and Harmless dataset"](https://arxiv.org/abs/2411.08243).
+This repository contains the data and code for the paper, ["Beyond the Safety Bundle: Auditing the Helpful and Harmless dataset"](https://arxiv.org/abs/2411.08243).
 
 ## Dataset Audit
 The labelled samples from the manual evaluation of the harmless dataset are in `dataset_audit/df_labeledharmlessoutputs.csv`. Results from the second round of labelling are in `dataset_audit/df_labeledharmlessoutputs_second_round.csv` 
@@ -13,3 +13,14 @@ The rest of the files in this repository are for generating and evaluating model
 * `toxicity_classification.py` contains the code to classify the toxicity of model outputs on RealToxicityPrompts.
 * `analysis.ipynb` contains the results from our experiments on XSTest. The `out/xstest_eval` folder contains the generations from our models.
 * `inference_datasets.py` and `utils.py` help to load and process the datasets.
+
+## Citation
+```bibtex
+@inproceedings{chehbouni2025beyond,
+  title={Beyond the safety bundle: Auditing the helpful and harmless dataset},
+  author={Chehbouni, Khaoula and Carr Cola{\c{c}}o, Jonathan and More, Yash and Cheung, Jackie CK and Farnadi, Golnoosh},
+  booktitle={Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers)},
+  pages={11895--11925},
+  year={2025}
+}
+```
